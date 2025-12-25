@@ -22,7 +22,12 @@ const CONFIG = {
 // ?? THIS IS A MIRROR - DO NOT EDIT DIRECTLY
 // Edit in Apps Script, then run pushToGitHub()
 
-// Last sync: 2025-12-25T05:20:42.491Z
+// Last sync: 2025-12-25T05:51:08.870Z
+
+// ============ doGet ============
+function doGet(e) {
+  return HtmlService.createTemplateFromFile('Index').evaluate().setTitle('V12.8 Analyst Center | TRUNG T?M PH?N T?CH').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
 
 // ============ getSystemData ============
 function getSystemData() {
