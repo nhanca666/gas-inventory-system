@@ -431,18 +431,65 @@ confirmExportExcel() {
     this.dialogExportExcel = false;
     this.loading = true;
     this.loadingText = '? ?ang chu?n b? d? li?u...';
-
+    
+    const shouldExplodeBOM = this.exportConfig.explodeBOM === true;
+    const unitMode = this.exportConfig.unitMode || 'ORIGINAL';
+    
     
     let filteredData = this.spoilageHistory.filter(item => 
         this.exportConfig.itemTypes.includes(item.type)
     );
     
-    console.log('? [DEBUG] Filtered data:', filteredData.length);
-
+    console.log('? [DEBUG] Filtered data count:', filteredData.length);
+    console.log('? [DEBUG] Explode BOM:', shouldExplodeBOM);
     
-    const exportData = filteredData.map(item => {
-        return {
-            code: String(item.code || '').trim(), 
+    
+    let exportData = [];
+    
+    if (shouldExplodeBOM) {
+        
+        
+        filteredData.forEach(item => {
+            const itemType = item.type || 'NVL';
+            
+            if (itemType === 'NVL') {
+                
+                exportData.push({
+                    code: this.formatItemCodeVN(item.code),
+                    name: item.name,
+                    qty: item.qty,
+                    unit: item.unit,
+                    amount: item.amount || 0,
+                    dept: item.dept || '',
+                    note: item.note || '',
+                    date: item.date || '',
+                    type: 'NVL',
+                    originalCode: '',
+                    originalName: '',
+                    needExplode: false
+                });
+            } else {
+                
+                exportData.push({
+                    code: this.formatItemCodeVN(item.code),
+                    name: item.name,
+                    qty: item.qty,
+                    unit: item.unit,
+                    amount: item.amount || 0,
+                    dept: item.dept || '',
+                    note: item.note || '',
+                    date: item.date || '',
+                    type: itemType,
+                    originalCode: item.code,
+                    originalName: item.name,
+                    needExplode: true  
+                });
+            }
+        });
+    } else {
+        
+        exportData = filteredData.map(item => ({
+            code: this.formatItemCodeVN(item.code),
             name: item.name,
             qty: item.qty,
             unit: item.unit,
@@ -450,21 +497,25 @@ confirmExportExcel() {
             dept: item.dept || '',
             note: item.note || '',
             date: item.date || '',
-            type: item.type
-        };
-    });
-
+            type: item.type || 'NVL',
+            originalCode: '',
+            originalName: '',
+            needExplode: false
+        }));
+    }
+    
+    console.log('? [DEBUG] Export data count:', exportData.length);
     console.log('? [DEBUG] Calling Backend...');
     
     
     this.pollExportProgress();
-
+    
     
     google.script.run
         .withSuccessHandler((res) => {
             console.log('? [DEBUG] Backend response:', res);
             this.loading = false;
-            clearInterval(this.exportProgressInterval); 
+            clearInterval(this.exportProgressInterval);
             
             if (res.success) {
                 window.open(res.url, '_blank');
@@ -480,6 +531,17 @@ confirmExportExcel() {
             this.showNotify('L?i: ' + err.message, 'error');
         })
         .exportSpoilageToExcel(exportData, this.exportConfig);
+},
+
+
+formatItemCodeVN(code) {
+    if (!code) return '';
+    let codeStr = String(code).trim();
+    
+    if (/^\d+\.\d+$/.test(codeStr)) {
+        codeStr = codeStr.replace('.', ',');
+    }
+    return codeStr;
 },
 
 
