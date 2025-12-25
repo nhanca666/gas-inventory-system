@@ -1,0 +1,615 @@
+  <script>
+  
+
+  new Vue({
+  el:'#app',vuetify:new Vuetify(),
+  data:()=>({
+  exportProgressInterval: null, 
+   
+  loading:false,activeTab:4,drawer:null,loadingText:'',snackText:'',snackColor:'success',
+  snackbar:{show:false,text:"",color:"success"},
+  dialogQuickAdd:{show:false},dialogImportSales:{show:false},dialogEdit:false,
+  dialogBOM:false,dialogMaster:{show:false,action:'',item:{}},dialogReplace:{show:false,oldCode:'',newCode:''},
+  dialogTrace:{show:false,items:[],target:''},dialogConfirm:{show:false,title:'',text:'',action:null,payload:null},
+  dialogConfirmMaster:false,dialogColumnConfig:false,dialogEditHistory:false,dialogWidthConfig:false,
+  dialogConfigCols:false,dialogKaizen:false,
+   
+  excelFile:null,auditFromDate:"",auditToDate:"",filterCounter:0,currentQuery:'',cleanQueryCache:'',
+  dashboardMode:'QTY',showDashboard:true,masterSubTab:0,filterMasterDept:null,activeMLTab:0,
+  filterSpoilageTeam: null, 
+  spoilageDisplayMode: 'ORIGINAL', 
+  dialogExportExcel: false, 
+  exportConfig: { 
+    dateMode: 'MONTH', 
+    unitMode: 'ORIGINAL',
+    fromDate: '',
+    toDate: '',
+    includeToday: false, 
+    itemTypes: ['NVL', 'SEMI', 'PROD'], 
+    explodeBOM: false 
+},
+dialogBOMSpoilage: false, 
+currentSpoilageItem: {}, 
+spoilageBOMDetails: [], 
+  historyFromDate:new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().substr(0,10),
+  historyToDate:new Date().toISOString().substr(0,10),spoilageDate: new Date().toISOString().substr(0, 7), 
+  spoilageDept:'Kitchen',historySearch:'',historySearchInput:'',searchTimer:null,
+  searchMaster:'',searchSemiKit:'',searchSemiPzz:'',searchSemiSvc:'',mlFilterKw:'',mlFilterDept:null,mlFilterStore:null,
+  historyFilterStatus:'ALL',tableRenderKey:0,sortableInstance:null,draggingIndex:-1,kaizenInput:'',
+   
+  masterData:[],stores:[],mlData:[],historyData:[],traceData:{},treeStructure:[],
+  newProducts:[],validSales:[],parsedTransferData:[],unknownStores:[],parsedSpoilageData:[],
+  selectedSpoilage:[],bomIngredients:[],tracePeriods:[],selectedTracePeriod:null,
+   
+  allHistoryHeaders:[{text:'Xong',value:'status',width:'60px',align:'center',show:true},{text:'Ng?y',value:'date',width:'100px',show:true},{text:'Nh?n Vi?n',value:'sender',width:'160px',show:true},{text:'Lo?i',value:'type',width:'90px',align:'center',show:true},{text:'Store',value:'store',width:'100px',align:'start',show:true},{text:'M? H?ng',value:'code',width:'100px',show:true,align:'start'},{text:'T?n H?ng',value:'itemName',width:'300px',show:true},{text:'SL',value:'qty',align:'end',width:'90px',show:true,class:'font-weight-black'},{text:'?VT',value:'unit',align:'start',width:'70px',show:true},{text:'H? S?',value:'rate',align:'center',width:'80px',show:true},{text:'Ti?n',value:'amount',align:'end',width:'110px',show:true},{text:'Team',value:'team',width:'90px',align:'center',show:true},{text:'',value:'actions_edit',width:'50px',sortable:false,show:true,align:'center'}],
+  headersTrace:[{text:'code',value:'code',width:'110px'},{text:'name',value:'name',width:'240px'},{text:'qty',value:'qty',width:'120px'},{text:'totalUsage',value:'totalUsage',width:'140px'},{text:'unit',value:'unit',width:'80px'},{text:'path',value:'path'}],
+  headersSemi:[{text:'M? & T?n',value:'code',width:'160px'},{text:'Gi? G?c',value:'cost',width:'75px',align:'end'},{text:'?.L??ng',value:'yield',width:'70px',align:'center'},{text:'Gi? Batch',value:'batchPrice',width:'90px',align:'end'},{text:'?VT',value:'unit',width:'50px',align:'center'},{text:'',value:'actions',width:'70px',sortable:false}],
+  headersNVL:[{text:'M? H?ng',value:'code',show:true,width:'100px'},{text:'T?n H?ng',value:'name',show:true},{text:'?VT G?c',value:'unit',show:true,align:'center'},{text:'?VT Mua',value:'stdUnit',show:false},{text:'H? s?',value:'rate',show:false,align:'center'},{text:'Gi? Mua',value:'buyingPrice',show:true,align:'right'},{text:'Gi? V?n',value:'cost',show:true,align:'right'},{text:'Tr?ng th?i',value:'status',show:true},{text:'H?nh ??ng',value:'actions',show:true,sortable:false,align:'right'}],
+  headersSEMI:[{text:'M? H?ng',value:'code',show:true,width:'100px'},{text:'T?n H?ng',value:'name',show:true},{text:'?VT',value:'unit',show:true,align:'center'},{text:'Yield',value:'yield',show:true,align:'center'},{text:'Gi? V?n',value:'cost',show:true,align:'right'},{text:'B? Ph?n',value:'dept',show:true},{text:'Tr?ng th?i',value:'status',show:true},{text:'H?nh ??ng',value:'actions',show:true,sortable:false,align:'right'}],
+  headersPROD:[{text:'M? H?ng',value:'code',show:true,width:'100px'},{text:'T?n H?ng',value:'name',show:true},{text:'?VT',value:'unit',show:true,align:'center'},{text:'M? SAP',value:'sapCode',show:true},{text:'Team',value:'team',show:true},{text:'Gi? V?n',value:'cost',show:true,align:'right'},{text:'Tr?ng th?i',value:'status',show:true},{text:'H?nh ??ng',value:'actions',show:true,sortable:false,align:'right'}],
+  headersML:[{text:'',value:'actions',width:'60px'},{text:'T? Kh?a',value:'term'},{text:'Ng? C?nh',value:'context',width:'180px'},{text:'M? ??ch',value:'code'}],
+  options:{itemsPerPage:15,sortBy:['date'],sortDesc:[true]},
+  
+   
+  sheetConfig:{},rawTransferInput:"",rawSpoilageInputNVL:"",rawSpoilageInputProduct:"",
+  page:1,itemsPerPage:50,editingItem:{},bomHeader:{},currentBOMItem:{},itemToDelete:null,
+  showSourceHints:false,columnMapping:{status:8,category:9,supplier:10,cost:11},
+  editedHistoryItem:{},filterType:null,filterStoreLocation:null,filterTeam:null,
+  headersTransfer:[{text:'',value:'actions_left',width:'50px',sortable:false},{text:'NG?Y',value:'date',width:'100px'},{text:'NH?N VI?N',value:'staff',width:'160px'},{text:'LO?I',value:'type',width:'80px',align:'center'},{text:'STORE',value:'storeName',width:'80px'},{text:'SL',value:'qty',width:'90px',align:'end',class:'black--text'},{text:'?VT',value:'unit',width:'60px',align:'end',class:'black--text'},{text:'H? S?',value:'rate',width:'90px',align:'center'},{text:'B? PH?N',value:'team',width:'110px'},{text:'M? ??CH',value:'code',width:'100px'},{text:'T?N H?NG',value:'name'},{text:'',value:'actions',width:'60px',sortable:false}],
+  headersSpoilage:[{text:'',value:'actions_left',width:'50px',sortable:false},{text:'SL',value:'qty',width:'90px',align:'end',class:'black--text'},{text:'?VT',value:'unit',width:'60px',align:'end',class:'black--text'},{text:'HS',value:'factor',width:'80px',align:'center'},{text:'M? ??CH',value:'code',width:'110px'},{text:'T?N H?NG',value:'name'},{text:'',value:'actions',width:'60px',sortable:false}],
+  
+  menuSpoilageDate: false,
+  spoilageHistory: [],
+  headersSpoilageHistory: [
+    { text: 'Ng?y', value: 'date', width: '80px', align: 'center' },
+    { text: 'M?', value: 'code', width: '100px' },
+    { text: 'T?n h?ng', value: 'name' },
+    { text: 'S? l??ng', value: 'qty', align: 'end', width: '120px' },
+    { text: 'Th?nh ti?n', value: 'amount', align: 'end', width: '130px' },
+    { text: '?', value: 'hasPrice', align: 'center', width: '50px' },
+    { text: 'Team', value: 'dept', width: '100px' },
+    { text: 'L? do', value: 'note', width: '180px' },
+],
+  }),
+
+   
+  created(){this.loadSystemData();this.loadCols();this.initializeSystem()},
+  mounted(){const savedHeaders=localStorage.getItem('v12_history_headers_final');if(savedHeaders){try{const parsed=JSON.parse(savedHeaders);if(parsed.length===this.allHistoryHeaders.length){this.allHistoryHeaders=parsed}}catch(e){console.error("Error loading headers",e)}}this.$nextTick(()=>{this.initSortable();this.setupInteractions()})},
+
+  
+
+   
+
+  computed:{
+  editorMasterData(){const t=this.editingItem.type;return this.masterData.filter(x=>{if(t==='ML_PROD')return x.type==='PROD';return x.type!=='PROD'}).map(x=>{let dCode=x.code;if(t==='ML_PROD'&&x.sapCode)dCode=x.sapCode;return{...x,code:dCode,originalInternalCode:x.code,editorLabel:`${dCode} - ${x.name}`,editorCode:dCode}})},
+  storeCodes(){return this.stores.map(s=>s.code)},
+  uniqueMLContexts(){return Array.from(new Set(this.mlData.map(x=>x.dept||x.store).filter(Boolean))).sort()},
+  activeHeadersList(){if(this.masterSubTab===2)return this.headersPROD;if(this.masterSubTab===1)return this.headersSEMI;return this.headersNVL},
+  visibleMasterHeaders(){return this.activeHeadersList.filter(h=>h.show!==false)},
+  visibleHistoryHeaders(){return this.allHistoryHeaders.filter(h=>h.show!==false)},
+  semiDataKit(){return this.filterSemiData('Kit',this.searchSemiKit)},
+  semiDataPzz(){return this.filterSemiData('Pizza',this.searchSemiPzz)},
+  semiDataSvc(){return this.filterSemiData('Service',this.searchSemiSvc)},
+  pageCount(){return Math.ceil(this.parsedSpoilageData.length/this.itemsPerPage)},paginatedSpoilageData(){const start=(this.page-1)*this.itemsPerPage;return this.parsedSpoilageData.slice(start,start+this.itemsPerPage)},
+  splitSpoilageData(){const items=this.paginatedSpoilageData;const half=Math.ceil(items.length/2);return{left:items.slice(0,half),right:items.slice(half)}},
+  modifiedHistoryItems(){return this.historyData.filter(item=>item.rateState>0)},
+  modifiedHistoryCount(){return this.modifiedHistoryItems.length},
+  filteredMasterData(){let data=this.masterData;if(this.masterSubTab===1)data=data.filter(x=>(x.type==='SEMI'||(String(x.code).length<5&&String(x.code).trim()!=='')));else if(this.masterSubTab===2)data=data.filter(x=>x.type==='PROD');else data=data.filter(x=>x.type==='NVL'&&String(x.code).length>=5);if(this.filterMasterDept)data=data.filter(x=>x.sourceSheet&&x.sourceSheet.includes(this.filterMasterDept));if(this.searchMaster){const s=this.removeAccents(this.searchMaster).toLowerCase().trim();data=data.filter(item=>item.searchStr.includes(s))}return data},
+  filteredMLData(){let target='NVL';if(this.activeMLTab===1)target='SEMI';else if(this.activeMLTab===2)target='PROD';else if(this.activeMLTab===3)target='TRANS';let data=this.mlData.filter(x=>x.realType===target).map(x=>{const mas=this.masterData.find(m=>String(m.code)===String(x.code)||(m.type==='PROD'&&String(m.sapCode||'').trim()===String(x.code).trim()));let dCode=x.code,dName='';if(mas){dName=mas.name;if(mas.type==='PROD'&&mas.sapCode)dCode=mas.sapCode;else dCode=mas.code}return{...x,code:dCode,name:dName,context:(x.realType==='TRANS')?(x.store||''):(x.dept||'')}});if(this.mlFilterKw){const kw=this.removeAccents(this.mlFilterKw.toLowerCase()).trim();data=data.filter(x=>x.searchStr.includes(kw))}if(target==='TRANS'&&this.mlFilterStore)data=data.filter(x=>x.context===this.mlFilterStore);if(target!=='TRANS'&&this.mlFilterDept)data=data.filter(x=>x.context===this.mlFilterDept);return data},
+  filteredHistoryData(){let data=this.historyData;const searchKw=this.historySearch?this.removeAccents(this.historySearch).trim().toLowerCase():'',teamKw=this.filterTeam?this.removeAccents(this.filterTeam).toLowerCase():'';let fT=0,tT=0;if(this.historyFromDate&&this.historyToDate){fT=new Date(this.historyFromDate).setHours(0,0,0,0);tT=new Date(this.historyToDate).setHours(23,59,59,999)}return data.filter(i=>{if(this.filterStoreLocation&&i.store!==this.filterStoreLocation)return false;if(this.filterType&&String(i.type).toUpperCase()!==this.filterType)return false;if(this.historyFilterStatus!=='ALL'&&i.status!==this.historyFilterStatus)return false;if(fT>0&&tT>0&&(i.timeVal<fT||i.timeVal>tT))return false;if(teamKw&&!i.normTeam.includes(teamKw))return false;if(searchKw&&!i.searchString.includes(searchKw))return false;return true})},
+  historySummary(){const d=this.filteredHistoryData,m=this.dashboardMode==='AMT',s={in:0,out:0,countIn:0,countOut:0,kitIn:0,pzzIn:0,svcIn:0,kitOut:0,pzzOut:0,svcOut:0,topIn:[],topOut:[]},mapIn={},mapOut={};d.forEach(i=>{const v=m?(Number(i.amount)||0):(Number(i.qty)||0),t=String(i.type).toUpperCase(),tm=String(i.team||'').toLowerCase(),k=i.code;let targetMap=null;if(t==='IN'){s.in+=v;s.countIn++;if(tm.includes('kitchen'))s.kitIn++;else if(tm.includes('pizza'))s.pzzIn++;else if(tm.includes('service'))s.svcIn++;targetMap=mapIn}else{s.out+=v;s.countOut++;if(tm.includes('kitchen'))s.kitOut++;else if(tm.includes('pizza'))s.pzzOut++;else if(tm.includes('service'))s.svcOut++;targetMap=mapOut}if(!targetMap[k])targetMap[k]={code:k,name:i.itemName,val:0,unit:i.unit,freq:0,stores:{}};targetMap[k].val+=v;targetMap[k].freq++;const st=i.store||'?';targetMap[k].stores[st]=(targetMap[k].stores[st]||0)+1});const process=(map)=>Object.values(map).sort((a,b)=>b.val-a.val).slice(0,5).map(x=>{const sortedStores=Object.entries(x.stores).sort((a,b)=>b[1]-a[1]);return{...x,storeStr:sortedStores.map(e=>`${e[0]}(${e[1]})`).join(', '),topStore:sortedStores[0][0]}});s.topIn=process(mapIn);s.topOut=process(mapOut);return s},
+  bomStats(){let total=0;this.bomIngredients.forEach(ing=>{if(ing.code&&ing.qty){const item=this.masterData.find(m=>m.code==ing.code);if(item)total+=(parseFloat(ing.qty)*(parseFloat(item.cost)||0))}});const yieldVal=parseFloat(this.bomHeader.yield)||1;return{totalCost:Math.round(total),unitCost:parseFloat((total/yieldVal).toFixed(2))}},
+   
+spoilageStats() {
+    let totalVal = 0, hasZeroCost = false;
+    let byTeam = { Kitchen: 0, Pizza: 0, Service: 0, Bar: 0 };
+    let byType = { NVL: 0, SEMI: 0, PROD: 0 }; 
+    let byReason = {}; 
+    let itemMap = {};
+    const isAmt = (this.dashboardMode === 'AMT');
+    
+    let sourceData = this.spoilageHistory || [];
+    if (this.filterSpoilageTeam) {
+        sourceData = sourceData.filter(i => {
+            const d = String(i.dept || '').toLowerCase();
+            const t = this.filterSpoilageTeam.toLowerCase();
+            return d.includes(t);
+        });
+    }
+
+    sourceData.forEach(i => {
+        let val = isAmt ? (Number(i.amount) || 0) : (Number(i.qty) || 0);
+        totalVal += val;
+
+        if (Number(i.qty) > 0 && Number(i.amount) === 0) hasZeroCost = true;
+
+        
+        let t = 'Kitchen';
+        const d = String(i.dept || '').toLowerCase();
+        if (d.includes('pizza')) t = 'Pizza';
+        else if (d.includes('service')) t = 'Service';
+        else if (d.includes('bar')) t = 'Bar';
+        byTeam[t] = (byTeam[t] || 0) + val;
+
+        
+        const type = i.type || 'NVL';
+        byType[type] = (byType[type] || 0) + val;
+
+        
+        let reason = i.note || 'Kh?ng ghi ch?';
+        byReason[reason] = (byReason[reason] || 0) + val;
+
+        
+        if (!itemMap[i.code]) itemMap[i.code] = { name: i.name, val: 0, type: i.type };
+        itemMap[i.code].val += val;
+    });
+
+    
+    let top3Items = Object.values(itemMap)
+        .sort((a, b) => b.val - a.val)
+        .slice(0, 3);
+
+    
+    let top3Reasons = Object.entries(byReason)
+        .map(([reason, val]) => ({ reason, val }))
+        .sort((a, b) => b.val - a.val)
+        .slice(0, 3);
+
+    let isCritical = top3Items.length > 0 && (
+        (isAmt && top3Items[0].val > 500000) ||
+        (!isAmt && top3Items[0].val > 20)
+    );
+
+    const unitLabel = isAmt ? '?' : 'Gram';
+
+    return { 
+        totalVal, 
+        unitLabel,
+        hasZeroCost, 
+        byTeam, 
+        byType,
+        byReason: top3Reasons, 
+        top3Items, 
+        isCritical,
+        totalCount: sourceData.length,
+        filteredCount: this.spoilageHistory ? this.spoilageHistory.length : 0
+    };
+},
+filteredSpoilageHistory() {
+    if (!this.filterSpoilageTeam) return this.spoilageHistory;
+    return this.spoilageHistory.filter(i => {
+        const d = String(i.dept || '').toLowerCase();
+        const t = this.filterSpoilageTeam.toLowerCase();
+        return d.includes(t);
+    });
+},
+displayedSpoilageHistory() {
+    return this.filteredSpoilageHistory.map(item => {
+        const master = this.masterData.find(m => m.code === item.code);
+        
+        let displayQty = item.qty;
+        let displayUnit = item.unit;
+        
+        
+        if (this.spoilageDisplayMode === 'CONVERTED' && master && master.stdUnit && master.rate > 1) {
+            displayQty = item.qty / master.rate;
+            displayUnit = master.stdUnit;
+        }
+        
+        
+        
+        return {
+            ...item,
+            _displayQty: displayQty,
+            _displayUnit: displayUnit,
+            _canConvert: (master && master.stdUnit && master.rate > 1)
+        };
+    });
+},
+  },watch:{
+  visibleHistoryHeaders:{handler(){this.$nextTick(()=>this.initSortable())},deep:true},
+  headersNVL:{handler(){this.saveCols()},deep:true},
+  headersSEMI:{handler(){this.saveCols()},deep:true},
+  headersPROD:{handler(){this.saveCols()},deep:true},
+ 
+    
+    
+     
+activeTab(val) {
+    
+    if (val === 2) {
+        
+        if (this.spoilageHistory.length === 0) {
+            this.getSpoilageHistory();
+        }
+        
+        this.$nextTick(() => window.scrollTo(0, 0));
+    }
+},
+
+spoilageDate() {
+    
+    if (this.activeTab === 2) {
+        this.getSpoilageHistory();
+    }
+}, 
+  },methods:{
+   
+  formatTraceUsage:function(n,u){if(n===null||n===undefined||isNaN(n))return'0 '+(u||'');return this.formatNumber(n)+' '+(u||'')},
+  applyQuickFilter(type,team){this.filterType=type;this.filterTeam=team;this.showNotify(`?? l?c: ${type} - ${team||'T?t c?'}`)},
+  saveCols(){localStorage.setItem('cfg_NVL',JSON.stringify(this.headersNVL));localStorage.setItem('cfg_SEMI',JSON.stringify(this.headersSEMI));localStorage.setItem('cfg_PROD',JSON.stringify(this.headersPROD))},
+  loadCols(){const n=localStorage.getItem('cfg_NVL'),s=localStorage.getItem('cfg_SEMI'),p=localStorage.getItem('cfg_PROD');if(n)this.headersNVL=JSON.parse(n);if(s)this.headersSEMI=JSON.parse(s);if(p)this.headersPROD=JSON.parse(p)},
+  calculateCostFromBuying(){const p=parseFloat(this.dialogMaster.item.buyingPrice)||0;const r=parseFloat(this.dialogMaster.item.rate)||1;if(r>0)this.dialogMaster.item.cost=Math.round(p/r)},
+  getUnitPrice(code){if(!code)return 0;const item=this.masterData.find(m=>m.code==code);if(!item)return 0;return parseFloat(item.cost)||0},
+  showNotify(m,color='success'){this.snackText=m;this.snackColor=color;this.snackbar.show=true},
+   
+  loadSystemData(){this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;if(!res||res.success===false){this.showNotify(res?res.message:"L?i",'error');return}this.masterData=res.masterData.map(m=>{let bp=m.batchPrice;if(!bp){const c=(typeof m.cost==='string')?parseFloat(m.cost.replace(',','.')):m.cost;const y=(typeof m.yield==='string')?parseFloat(m.yield.replace(',','.')):m.yield;bp=(Number(c)||0)*(Number(y)||1)}return{...m,buyingPrice:Math.round(Number(m.buyingPrice)||0),fullName:`${m.code} - ${m.name}`,batchPrice:bp,searchStr:this.removeAccents(`${m.code} ${m.name} ${m.group||''}`).toLowerCase()}});this.stores=res.stores;this.mlData=res.mlData.map(x=>{const mas=this.masterData.find(m=>String(m.code)===String(x.code));let realType='NVL';if(x.type==='ML_TRANS')realType='TRANS';else if(x.type==='ML_PROD'||(mas&&mas.type=='PROD'))realType='PROD';else if(mas&&String(mas.code).trim()!==''&&String(mas.code).trim().length<5)realType='SEMI';let dCode=x.code;if(realType==='PROD'&&mas&&mas.sapCode)dCode=mas.sapCode;return{...x,realType,code:dCode,internalCode:x.code,searchStr:this.removeAccents(`${x.term} ${x.dept||''} ${x.store||''} ${dCode} ${mas?mas.name:''}`).toLowerCase()}});this.sheetConfig=res.sheetNames;this.historyData=(res.transferHistory||[]).map(h=>{let master=this.masterData.find(m=>String(m.code)===String(h.code));if(!master){const normName=this.removeAccents(h.itemName);master=this.masterData.find(m=>this.removeAccents(m.name)===normName)}const rawUnit=h.minUom||(master?master.unit:'');const stdUnit=master?(master.stdUnit||master.unit):rawUnit;const absoluteBaseQty=h.originalQty?h.originalQty:(h.isDivided?(h.qty*(h.rate||1)):h.qty);const normTeam=this.removeAccents(h.team||'Unknown').toLowerCase();const searchStr=this.removeAccents(`${h.code} ${h.itemName||''} ${master?.name||''} ${h.sender||''} ${h.receiver||''} ${h.note||''} ${h.team||''} ${h.store||''}`).toLowerCase();const parts=h.date.split('/');const timeVal=(parts.length===3)?new Date(parts[2],parts[1]-1,parts[0]).getTime():0;const finalCost=(Number(master?master.cost:0)||0);const finalYield=(Number(master?master.yield:1)||1);const batchPriceVal=(master&&master.batchPrice)?master.batchPrice:(finalCost*finalYield);return{...h,code:master?master.code:(h.code||''),rate:master?master.rate:(h.rate||1),baseUnit:rawUnit,standardUnit:stdUnit,rateState:0,originalQty:absoluteBaseQty,originalUnit:rawUnit,qty:absoluteBaseQty,unit:rawUnit,team:h.team||'Unknown',itemName:h.itemName||(master?master.name:''),normTeam:normTeam,searchString:searchStr,timeVal:timeVal,batchPrice:batchPriceVal}});this.$nextTick(()=>this.initSortable())}).withFailureHandler(err=>{this.loading=false;this.showNotify("L?i k?t n?i",'error')}).getSystemData()},
+   
+  resetAllSettings(){localStorage.clear();location.reload();this.showNotify('?? x?a b? nh? ??m v? t?i l?i trang')},
+
+   
+  dragStart(i,e){this.draggingIndex=i;e.dataTransfer.effectAllowed='move'},
+  drop(i){if(this.draggingIndex===-1)return;const l=this.activeHeadersList;const m=l.splice(this.draggingIndex,1)[0];l.splice(i,0,m);this.draggingIndex=-1;this.saveCols()},
+  suggestNextCode(){const item=this.dialogMaster.item;const type=item.type;let list=[];if(type==='PROD'){list=this.masterData.filter(x=>x.type==='PROD')}else if(type==='SEMI'){const d=item.dept||'Kitchen';list=this.masterData.filter(x=>{if(x.type!=='SEMI'&&String(x.code).length>=5)return false;const s=x.sourceSheet||'';if(d==='Kitchen')return s.includes('Kit')&&!s.includes('Pzz')&&!s.includes('Service');if(d==='Pizza')return s.includes('Pzz')||s.includes('Pizza');if(d==='Service')return s.includes('Service')||s.includes('Svc');return true})}else{list=this.masterData.filter(x=>x.type==='NVL'&&String(x.code).length>=5)}let max=0;list.forEach(i=>{const n=parseInt(i.code);if(!isNaN(n)&&n>max)max=n});if(max===0){if(type==='NVL')max=10000;if(type==='SEMI'){if(item.dept==='Service')max=30000;else if(item.dept==='Pizza')max=40000;else max=20000}if(type==='PROD')max=7000000}this.dialogMaster.item.code=String(max+1)},
+  getIngType(code){if(!code)return'';const item=this.masterData.find(m=>String(m.code)===String(code)||(m.type==='PROD'&&String(m.sapCode)==String(code)));if(!item)return'NVL';if(item.type==='PROD')return'PROD';if(String(item.code).length<5||item.type==='SEMI')return'SEMI';return'NVL'},
+  getBatchPrice(item){let cost=item.cost;let yieldVal=item.yield;if(typeof cost==='string')cost=parseFloat(cost.replace(',','.'));if(typeof yieldVal==='string')yieldVal=parseFloat(yieldVal.replace(',','.'));return Math.round((Number(cost)||0)*(Number(yieldVal)||1))},
+  traceUsage(item){this.loading=true;this.dialogTrace.target=item.code+' - '+item.name;google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.dialogTrace.items=res.data;this.dialogTrace.show=true}else{this.showNotify(res.message,'error')}}).getTraceDataFromCache(item.code)},
+  autoResize(e){e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'},
+  initSortable(){const el=document.querySelector('.history-table .v-data-table-header tr');if(this.sortableInstance){this.sortableInstance.destroy();this.sortableInstance=null}if(el){this.sortableInstance=Sortable.create(el,{animation:200,delay:0,handle:'th',ghostClass:'sortable-ghost',dragClass:'sortable-drag',onEnd:this.onHeaderDrop})}},
+  onHeaderDrop(evt){if(evt.oldIndex===evt.newIndex)return;const item=this.allHistoryHeaders.splice(evt.oldIndex,1)[0];this.allHistoryHeaders.splice(evt.newIndex,0,item);this.saveHeadersToLocal();this.tableRenderKey++},
+  onConfirmAction(){this.dialogConfirm.show=false;const a=this.dialogConfirm.action;if(!a)return;if(a==='SAVE_TRANSFER')this.executeSaveTransfer();if(a==='SAVE_SPOILAGE')this.executeSaveSpoilage();if(a==='DELETE_HISTORY_ROW')this.executeDeleteHistory();if(a==='OPEN_NEW_BOM')this.openBOMEditor(this.dialogConfirm.payload);if(a==='EXECUTE_REPLACE'){this.loading=true;google.script.run.withSuccessHandler(r=>{this.loading=false;this.showNotify(r.message,r.success?'success':'error');if(r.success)this.loadSystemData()}).replaceBomIngredient(this.dialogReplace.oldCode,this.dialogReplace.newCode)}if(a==='executeBulkUpdateCosts')this.executeBulkUpdateCosts();if(a==='executeBrainReset')this.executeBrainReset();if(a==='executeKaizenUpdate')this.executeKaizenUpdate()},
+  saveHeadersToLocal(){localStorage.setItem('v12_history_headers_final',JSON.stringify(this.allHistoryHeaders));this.tableRenderKey++},
+
+  
+  
+  quickToggleMode() {
+    this.dashboardMode = (this.dashboardMode === 'QTY') ? 'AMT' : 'QTY';
+    this.showNotify(`?? chuy?n sang ${this.dashboardMode === 'QTY' ? 'S? L??NG' : 'TI?N'}`, 'info');
+},
+
+  
+  quickFilterSpoilage(team) {
+    this.filterSpoilageTeam = (this.filterSpoilageTeam === team) ? null : team;
+    const msg = this.filterSpoilageTeam ? `?ang l?c: ${team}` : 'Hi?n th? t?t c?';
+    this.showNotify(msg, 'info');
+},
+
+handleSpoilageRowClick(item) {
+    if (item.type === 'PROD' || item.type === 'SEMI') {
+        
+        this.currentBOMItem = {
+            code: item.code,
+            name: item.name,
+            type: item.type,
+            sourceSheet: item.type === 'PROD' ? 'Danh m?c Product' : (this.sheetConfig.kit || 'Kit Semi Store')
+        };
+        this.dialogBOM = true;
+        this.getBOMDetail(item.code);
+    } else {
+        
+        this.traceUsage(item);
+    }
+},
+
+
+toggleAllUnits() {
+    this.spoilageDisplayMode = (this.spoilageDisplayMode === 'ORIGINAL') ? 'CONVERTED' : 'ORIGINAL';
+    this.showNotify(`?? chuy?n sang ${this.spoilageDisplayMode === 'ORIGINAL' ? '?VT G?c' : '?VT Quy ??i'}`, 'info');
+},
+
+
+formatMoney(val) {
+    if (!val || val === 0) return '0';
+    return new Intl.NumberFormat('vi-VN').format(Math.round(val));
+},
+
+
+exportSpoilageToExcel() {
+    if (!this.spoilageHistory || this.spoilageHistory.length === 0) {
+        this.showNotify('Kh?ng c? d? li?u ?? xu?t', 'warning');
+        return;
+    }
+
+    this.loading = true;
+    this.loadingText = '?ang t?o file Excel...';
+
+    
+    const exportData = this.spoilageHistory.map(item => {
+        const master = this.masterData.find(m => m.code === item.code);
+        const rate = master ? master.rate : 1;
+        const stdUnit = master ? (master.stdUnit || item.unit) : item.unit;
+        
+        
+        const convertedQty = rate > 1 ? (item.qty / rate) : item.qty;
+        
+        return {
+            date: item.date,
+            code: item.code,
+            name: item.name,
+            qty_original: item.qty,
+            unit_original: item.unit,
+            qty_converted: convertedQty,
+            unit_converted: stdUnit,
+            amount: Math.round(item.amount),
+            dept: item.dept,
+            note: item.note || ''
+        };
+    });
+
+    
+    google.script.run
+        .withSuccessHandler((res) => {
+            this.loading = false;
+            if (res.success) {
+                window.open(res.url, '_blank');
+                this.showNotify('? ?? t?o file Excel th?nh c?ng!', 'success');
+            } else {
+                this.showNotify(res.message, 'error');
+            }
+        })
+        .withFailureHandler((err) => {
+            this.loading = false;
+            this.showNotify('L?i: ' + err.message, 'error');
+        })
+        .exportSpoilageToExcel(exportData, this.spoilageDate);
+},
+
+
+
+
+
+handleSpoilageRowClick(item) {
+    
+    if (item.type !== 'SEMI' && item.type !== 'PROD') {
+        this.showNotify('Ch? SEMI/PRODUCT m?i c? BOM', 'info');
+        return;
+    }
+    
+    this.currentSpoilageItem = { ...item };
+    this.loading = true;
+    this.loadingText = '? ?ang ph?n t?ch BOM...';
+    
+    
+    google.script.run
+        .withSuccessHandler((res) => {
+            this.loading = false;
+            if (res.success) {
+                this.spoilageBOMDetails = res.data;
+                this.dialogBOMSpoilage = true;
+            } else {
+                this.showNotify(res.message, 'error');
+            }
+        })
+        .withFailureHandler((err) => {
+            this.loading = false;
+            this.showNotify('L?i: ' + err.message, 'error');
+        })
+        .calculateSpoilageBOM(item.code, item.qty, item.unit);
+},
+
+
+formatQtyDisplay(val) {
+    if (!val && val !== 0) return '0';
+    
+    
+    return new Intl.NumberFormat('vi-VN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+    }).format(val);
+},
+
+openExportDialog() {
+    console.log('? [DEBUG] openExportDialog called');
+    
+    if (!this.spoilageHistory || this.spoilageHistory.length === 0) {
+        this.showNotify('Kh?ng c? d? li?u ?? xu?t', 'warning');
+        return;
+    }
+    
+    console.log('? [DEBUG] Data count:', this.spoilageHistory.length);
+    
+    
+    if (this.spoilageDate) {
+        const parts = this.spoilageDate.split('-');
+        if (parts.length === 2) {
+            const year = parts[0];
+            const month = parts[1];
+            this.exportConfig.fromDate = `${year}-${month}-01`;
+            const lastDay = new Date(year, month, 0).getDate();
+            this.exportConfig.toDate = `${year}-${month}-${lastDay}`;
+        }
+    }
+    
+    console.log('? [DEBUG] Opening dialog...');
+    this.dialogExportExcel = true;
+},
+
+confirmExportExcel() {
+    console.log('? [DEBUG] confirmExportExcel called');
+    console.log('? [DEBUG] Config:', this.exportConfig);
+    
+    this.dialogExportExcel = false;
+    this.loading = true;
+    this.loadingText = '? ?ang chu?n b? d? li?u...';
+
+    
+    let filteredData = this.spoilageHistory.filter(item => 
+        this.exportConfig.itemTypes.includes(item.type)
+    );
+    
+    console.log('? [DEBUG] Filtered data:', filteredData.length);
+
+    
+    const exportData = filteredData.map(item => {
+        return {
+            code: String(item.code || '').trim(), 
+            name: item.name,
+            qty: item.qty,
+            unit: item.unit,
+            amount: item.amount || 0,
+            dept: item.dept || '',
+            note: item.note || '',
+            date: item.date || '',
+            type: item.type
+        };
+    });
+
+    console.log('? [DEBUG] Calling Backend...');
+    
+    
+    this.pollExportProgress();
+
+    
+    google.script.run
+        .withSuccessHandler((res) => {
+            console.log('? [DEBUG] Backend response:', res);
+            this.loading = false;
+            clearInterval(this.exportProgressInterval); 
+            
+            if (res.success) {
+                window.open(res.url, '_blank');
+                this.showNotify('? ' + res.message, 'success');
+            } else {
+                this.showNotify(res.message, 'error');
+            }
+        })
+        .withFailureHandler((err) => {
+            console.error('? [DEBUG] Backend error:', err);
+            this.loading = false;
+            clearInterval(this.exportProgressInterval);
+            this.showNotify('L?i: ' + err.message, 'error');
+        })
+        .exportSpoilageToExcel(exportData, this.exportConfig);
+},
+
+
+pollExportProgress() {
+    this.exportProgressInterval = setInterval(() => {
+        google.script.run
+            .withSuccessHandler((progress) => {
+                if (progress) {
+                    this.loadingText = progress; 
+                }
+            })
+            .getExportProgress();
+    }, 1000); 
+},
+   
+  getSpoilageHistory() {
+    this.loading = true; 
+    
+    
+    let fromDate = "01/12/2025";
+    let toDate = "31/12/2025";
+    
+    if (this.spoilageDate) {
+        const parts = this.spoilageDate.split('-'); 
+        if (parts.length === 2) {
+            const year = parts[0];
+            const month = parts[1];
+            
+            
+            fromDate = `01/${month}/${year}`;
+            
+            // Ng?y cu?i th?ng (t?nh theo th?ng)
+            const lastDay = new Date(year, month, 0).getDate();
+            toDate = `${lastDay}/${month}/${year}`;
+        }
+    }
+    
+    console.log("? ?ang t?i h?y h?ng t?", fromDate, "??n", toDate);
+    
+    google.script.run
+        .withSuccessHandler((res) => {
+            console.log("? Backend tr? v?:", res);
+            this.loading = false;
+            
+            if (res.success) {
+                this.spoilageHistory = res.data || [];
+                if (this.spoilageHistory.length === 0) {
+                    this.showNotify("?? Kh?ng c? d? li?u h?y h?ng trong th?ng n?y", "warning");
+                } else {
+                    this.showNotify(`? ?? t?i ${this.spoilageHistory.length} phi?u h?y`, "success");
+                }
+            } else {
+                this.spoilageHistory = [];
+                this.showNotify(res.message || "L?i t?i d? li?u", "error");
+            }
+        })
+        .withFailureHandler((error) => {
+            this.loading = false;
+            this.spoilageHistory = [];
+            console.error("? L?i Backend:", error);
+            this.showNotify("L?i k?t n?i Backend: " + error.message, "error");
+        })
+        .getSpoilageHistory(fromDate, toDate);
+},
+  roundNumber(v, d) { return Number(Math.round(v + "e" + d) + "e-" + d) || 0; },
+  async analyzeAuditFile(){if(!this.excelFile){this.showNotify('?? Ch?u ch?a ch?n file Excel n?o c?!','error');return}if(!this.auditFromDate||!this.auditToDate){this.showNotify('?? Ch?u ch?a ch?n khung th?i gian!','error');return}this.loading=true;this.loadingText='?ang ??c file Excel...';try{await new Promise(r=>setTimeout(r,100));const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=(e)=>resolve(e.target.result);reader.onerror=(e)=>reject(e);reader.readAsArrayBuffer(this.excelFile)});this.loadingText='?ang ph?n t?ch d? li?u...';await new Promise(r=>setTimeout(r,100));if(typeof XLSX==='undefined')throw new Error("L?i th? vi?n SheetJS!");const workbook=XLSX.read(data,{type:'array'});const worksheet=workbook.Sheets[workbook.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(worksheet,{header:1});this.processExcelRows(rows)}catch(error){console.error('? Error Import:',error);this.showNotify('L?i: '+error.message,'error');this.validSales=[];this.newProducts=[]}finally{this.loading=false;this.loadingText=''}},
+  processExcelRows(rows){this.validSales=[];if(!rows||rows.length<2){this.showNotify("File r?ng tu?ch!","error");return}let i=1;const total=rows.length;const run=()=>{try{const end=Math.min(i+1000,total);for(;i<end;i++){const c=rows[i];if(c&&c.length>5){const rCode=String(c[1]||"").trim();const store=String(c[2]||"").trim();const p=(v)=>parseFloat(String(v||0).replace(/,/g,''))||0;const q=p(c[5]);let code="",name="";const m=rCode.match(/^(\d+)\s*[-?]?\s*(.*)$/);if(m){code=m[1];name=m[2].trim().replace(/^[-?]/,'').trim()}else{code=rCode;name=rCode}if(q>0){const exists=this.masterData.find(x=>String(x.code)===String(code));const isNew=!exists;this.validSales.push({code,name,store,qty:q,qtyDeli:p(c[6]),qtyDine:p(c[7]),qtyTake:p(c[8]),category:String(c[3]||""),class:String(c[4]||""),team:'Service',isNew})}}}if(i<total){setTimeout(run,1)}else{this.showNotify(`?? qu?t xong ${this.validSales.length} d?ng! M? m?i hay c? ??u l?u ???c h?t.`,'success');if(this.validSales.length>0)this.saveSalesToSystem()}}catch(e){this.showNotify("L?i d?ng "+i+": "+e.message,"error")}};run()},
+  saveSalesToSystem(){if(this.newProducts.length>0){this.loading=false;this.showNotify("Ch?u c?n x? l? c?c m? m?i tr??c khi l?u nh?!","error");return}this.loading=true;this.loadingText='?ang g?i d? li?u v? Server...';const payload={period:`${this.auditFromDate} -> ${this.auditToDate}`,items:this.validSales};google.script.run.withSuccessHandler(res=>{this.loading=false;this.loadingText='';if(res.success){this.showNotify("? ?? l?u doanh thu th?nh c?ng!");this.dialogImportSales.show=false;this.validSales=[];this.newProducts=[]}else{this.showNotify(res.message,"error")}}).withFailureHandler(err=>{this.loading=false;this.loadingText='';console.error(err);this.showNotify("? L?i Backend: "+err.message,"error")}).importSalesHistory(payload)},
+  handleReplaceIngredient(){if(!this.oldIngredientCode||!this.newIngredientCode){alert("Ch?u ?i, ph?i nh?p ?? M? c? v? M? m?i nh?!");return}this.isLoading=true;google.script.run.withSuccessHandler((res)=>{this.isLoading=false;if(res.success){alert("? Xong r?i ch? ?i: "+res.message);this.loadBomData()}else{alert("?? C? v?n ??: "+res.message)}}).withFailureHandler((error)=>{this.isLoading=false;alert("? L?i Backend r?i: "+error.message)}).replaceIngredientInBom(this.oldIngredientCode,this.newIngredientCode)},
+  requestUpdateAllCosts(){this.openConfirm('C?P NH?T GI? V?N?','H? th?ng s? qu?t l?i to?n b? c?ng th?c v? t?nh l?i gi? v?n d?a tr?n gi? NVL hi?n t?i. Vi?c n?y c? th? m?t v?i gi?y.','EXECUTE_UPDATE_COSTS')},
+  executeUpdateAllCosts(){this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;this.showNotify(res.message);this.loadSystemData()}).updateAllBOMCosts()},
+  calculateLineTotal(ing){if(!ing.code||!ing.qty)return 0;const item=this.masterData.find(m=>m.code==ing.code);if(!item)return 0;const price=parseFloat(item.cost)||0;return parseFloat(ing.qty)*price},
+  executeBulkReplace(){if(!this.dialogReplace.oldCode||!this.dialogReplace.newCode)return this.showNotify('Vui l?ng ch?n ?? m?!','error');this.openConfirm('X?C NH?N THAY TH??',"Thay th? m? "+this.dialogReplace.oldCode+" b?ng "+this.dialogReplace.newCode+" trong to?n b? h? th?ng?",'EXECUTE_REPLACE')},
+  filterSemiData(d,s){let dt=this.masterData.filter(x=>(x.type==='SEMI'||(String(x.code).length<5&&String(x.code).trim()!==''))&&x.sourceSheet&&(x.sourceSheet.includes(d)||x.sourceSheet.includes('Pzz')||x.sourceSheet.includes('Pizza')));if(s){const k=this.removeAccents(s).toLowerCase().trim();dt=dt.filter(i=>i.searchStr.includes(k))}return dt},
+  debounceSearch(val){if(this.searchTimer)clearTimeout(this.searchTimer);this.searchTimer=setTimeout(()=>{this.historySearch=val},900)},
+  analyzeTransfer(){this.parsedTransferData=[];const lines=this.rawTransferInput.split(/\r?\n/).filter(l=>l.trim());const currentYear=new Date().getFullYear();let curDate=new Date().toLocaleDateString('vi-VN');let curSender='';let curReceiver='';let curType='';let curStore='Unknown';const normalizedStores={};this.stores.forEach(s=>{normalizedStores[this.normalizeKey(s.code)]=s;if(s.keywords){s.keywords.forEach(k=>normalizedStores[this.normalizeKey(k)]=s)}});lines.forEach(line=>{let text=line.trim();if(!text)return;const dateMatch=text.match(/^(\d{1,2})[./](\d{1,2})/);if(dateMatch){curDate=`${dateMatch[1]}/${dateMatch[2]}/${currentYear}`;text=text.replace(dateMatch[0],'').trim()}const typeMatch=text.match(/\b(IN|OUT)\b/i);let itemPayload=text;if(typeMatch){curType=typeMatch[1].toUpperCase();const tokens=text.split(/\s+/);let storeIndex=-1;let foundStoreCode='';for(let i=0;i<tokens.length;i++){const cleanToken=this.normalizeKey(tokens[i]);if(normalizedStores[cleanToken]){storeIndex=i;foundStoreCode=normalizedStores[cleanToken].code;break}}if(storeIndex!==-1){curStore=foundStoreCode;const preStoreText=tokens.slice(0,storeIndex).join(' ');itemPayload=tokens.slice(storeIndex+1).join(' ');const contextMatch=preStoreText.match(/^(?:(.*?)\s+)?\b(?:IN|OUT)\b\s*(.*)$/i);if(contextMatch){if(contextMatch[1])curSender=contextMatch[1].trim();if(contextMatch[2])curReceiver=contextMatch[2].trim()}else{const contextMatch2=preStoreText.match(/\b(?:IN|OUT)\b\s*(.*)$/i);if(contextMatch2&&contextMatch2[1])curReceiver=contextMatch2[1].trim()}}else{const headerMatch=text.match(/^(?:(.*?)\s+)?\b(IN|OUT)\b\s+(.*)$/i);if(headerMatch){if(headerMatch[1])curSender=headerMatch[1].trim();curStore='Unknown';let remText=headerMatch[3];const digitIdx=remText.search(/\d/);if(digitIdx>2){curReceiver=remText.substring(0,digitIdx).trim();itemPayload=remText.substring(digitIdx).trim()}else{curReceiver=remText;itemPayload=""}if(curStore==='Unknown'&&remText)this.unknownStores.push(remText)}}}if(!itemPayload)return;const itemSegments=itemPayload.split(',').map(s=>s.trim()).filter(s=>s);itemSegments.forEach(segment=>{this.parseSingleItem(segment,curDate,curSender,curReceiver,curStore,curType)})})},
+  parseSingleItem(text,curDate,curSender,curReceiver,curStore,curType){let cleanText=text.trim();if(!cleanText)return;let qty=0,unit='',rawName='';let matched=false;const mixedMatch=cleanText.match(/^(\d+)\s*(kg|k|l)\s*(\d+)\s*(.*)$/i);if(mixedMatch&&!matched){qty=parseFloat(`${mixedMatch[1]}.${mixedMatch[3]}`);unit=mixedMatch[2].toLowerCase().startsWith('k')?'Kg':'L';rawName=mixedMatch[4].trim();matched=true}if(!matched){const bMatch=cleanText.match(/^(\d+(?:[.,]\d+)?)\s*(b)\s+(.*)$/i);if(bMatch){qty=parseFloat(bMatch[1].replace(',','.'));unit='b';rawName=bMatch[3].trim();matched=true}}if(!matched){const stdMatch=cleanText.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Z%]+)?\s+(.*)$/i);if(stdMatch){const potentialUnit=(stdMatch[2]||'').toLowerCase();const commonUnits=['kg','g','gr','gram','l','ml','lit','chai','bich','bao','hop','cai','vi','pcs','b'];if(potentialUnit&&!commonUnits.includes(potentialUnit)&&potentialUnit.length>3){qty=parseFloat(stdMatch[1].replace(',','.'));unit='';rawName=`${stdMatch[2]} ${stdMatch[3]}`}else{qty=parseFloat(stdMatch[1].replace(',','.'));unit=stdMatch[2]||'';rawName=stdMatch[3].trim()}matched=true}}if(!matched){const revMatch=cleanText.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*([a-zA-Z%]+)?$/);if(revMatch){rawName=revMatch[1].trim();qty=parseFloat(revMatch[2].replace(',','.'));unit=revMatch[3]||'';if(!rawName.match(/^\d{1,2}[./]\d{1,2}$/)){matched=true}}}if(matched&&qty>0){const mlRes=this.findCodeML(rawName,'ML_TRANS',curStore);const master=this.masterData.find(m=>m.code==mlRes.code);const finalUnit=master?master.unit:unit;const stdUnit=master?(master.standardUnit||master.unit):finalUnit;const mRate=master?master.rate:1;this.parsedTransferData.push({date:curDate,sender:curSender||'Unknown',receiver:curReceiver||'Unknown',storeName:curStore,type:curType||'UNK',qty:qty,unit:finalUnit,name:master?master.name:rawName,code:mlRes.code,originalKeyword:rawName,rate:mRate,masterRate:mRate,rateState:0,originalQty:qty,originalUnit:finalUnit,baseUnit:finalUnit,itemType:master?master.type:'UNK',standardUnit:stdUnit,team:'Kitchen'})}},
+  toggleUnitAnalysis(item){const m=this.masterData.find(x=>x.code==item.code);if(!m||!m.stdUnit){this.showNotify('Thi?u ?VT quy ??i!','warning');return}item.unit=m.stdUnit;item.rate=Number(m.rate)||1;item.standardUnit=m.stdUnit;if(item.rateState===3){item.rateState=0}else{item.rateState=3}this.recalcQty(item)},
+  deleteTransferRow(item){const idx=this.parsedTransferData.indexOf(item);if(idx>-1){this.parsedTransferData.splice(idx,1);this.showNotify('?? x?a')}},
+  analyzeSpoilage(){this.parsedSpoilageData=[];this.page=1;const nvlLines=this.rawSpoilageInputNVL.split('\n').filter(l=>l.trim());nvlLines.forEach(l=>this.processSpoilageLine(l,'ML_NVL'));const prodLines=this.rawSpoilageInputProduct.split(/[\n,;]+/).filter(l=>l.trim());prodLines.forEach(l=>{this.processSpoilageLine(l,'ML_PROD')})},
+  processSpoilageLine(l,forceType){l=l.trim();if(!l)return;let note="";if(l.includes("'")){const parts=l.split("'");l=parts[0].trim();note=parts.slice(1).join("'").trim()}const eqMatch=l.match(/=\s*(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)?/);if(eqMatch){const qty=parseFloat(eqMatch[1].replace(',','.'));let namePart=l.split('=')[0].replace(/\([^)]+\)/g,'').replace(/:/g,'').trim();this.addSpoilageItem(qty,eqMatch[2]||'',namePart,forceType,note);return}const mathMatch=l.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|kg|ml|l)?\s*([+*x])\s*(\d+(?:[.,]\d+)?)/i);if(mathMatch){const n1=parseFloat(mathMatch[1].replace(',','.'));const op=mathMatch[2].toLowerCase();const n2=parseFloat(mathMatch[3].replace(',','.'));let result=0;if(op==='+')result=n1+n2;else if(op==='*'||op==='x')result=n1*n2;let namePart=l.replace(mathMatch[0],'').trim();this.addSpoilageItem(result,'C?i',namePart||l,forceType,note);return}const attachedUnitMatch=l.match(/(\d+)\s*(kg|l|L)\s*(\d+)/i);if(attachedUnitMatch){const mainVal=attachedUnitMatch[1];const unitVal=attachedUnitMatch[2];const decVal=attachedUnitMatch[3];const combinedQty=parseFloat(`${mainVal}.${decVal}`);let namePart=l.replace(attachedUnitMatch[0],'').trim();this.addSpoilageItem(combinedQty,unitVal,namePart,forceType,note);return}let qty=1,unit='C?i',rawName=l;const startMatch=l.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Z%]+)?\s+(.*)$/);const endMatch=l.match(/^(.*?)\s+(\d+(?:[.,]\d+)?)\s*([a-zA-Z%]+)?$/);const colonMatch=l.match(/^(.*?):\s*(\d+(?:[.,]\d+)?)\s*([a-zA-Z%]+)?$/);if(colonMatch){rawName=colonMatch[1].trim();qty=parseFloat(colonMatch[2].replace(',','.'));unit=colonMatch[3]||''}else if(startMatch){qty=parseFloat(startMatch[1].replace(',','.'));unit=startMatch[2]||'';rawName=startMatch[3].trim()}else if(endMatch){rawName=endMatch[1].trim();qty=parseFloat(endMatch[2].replace(',','.'));unit=endMatch[3]||''}this.addSpoilageItem(qty,unit,rawName,forceType,note)},
+  addSpoilageItem(qty,unit,rawName,forceType,note){let res={code:null};if(forceType==='ML_PROD'){res=this.findCodeML(rawName,'ML_PROD',this.spoilageDept)}else{res=this.findCodeML(rawName,'ML_NVL',this.spoilageDept);if(!res.code)res=this.findCodeML(rawName,'ML_SEMI',this.spoilageDept);if(!res.code)res=this.findCodeML(rawName,'ML_PROD',this.spoilageDept)}if(!res.code){const exact=this.masterData.find(m=>String(m.code)===String(rawName)||(m.type==='PROD'&&String(m.sapCode||'').trim()===String(rawName).trim()));if(exact)res.code=exact.code}const mas=this.masterData.find(x=>x.code==res.code||(x.type==='PROD'&&String(x.sapCode)==String(res.code)));let finalQty=qty,finalUnit=unit;if(mas){const uM=String(mas.unit||"").toLowerCase(),uI=String(unit||"").toLowerCase(),map={'kg':1000,'l':1000,'l?t':1000,'lit':1000,'g':1,'gr':1,'ml':1};if(map[uI]===1000&&map[uM]===1){finalQty=qty*1000;finalUnit=mas.unit}else if(map[uI]===1&&map[uM]===1000){finalQty=qty/1000;finalUnit=mas.unit}else{if(mas.unit)finalUnit=mas.unit}}if(this.spoilageDept==='Service'&&res.code&&['7140039','7140036','7140042'].includes(String(res.code))){const org=finalQty;finalQty=finalQty/200;const an=`H?y t? ${org}ml`;note=note?`${an} | ${note}`:an}let dType='UNK',dCode=res.code;if(mas){const cNum=parseFloat(mas.code);if(mas.type==='PROD'){dType='PROD';if(mas.sapCode)dCode=mas.sapCode}else if(!isNaN(cNum)&&cNum<1000)dType='SEMI';else dType='NVL'}else if(forceType==='ML_PROD')dType='PROD';this.parsedSpoilageData.push({qty:finalQty,unit:finalUnit,name:mas?mas.name:rawName,code:dCode,internalCode:mas?mas.code:res.code,originalKeyword:rawName,factor:mas?mas.rate:1,itemType:dType,originalQty:finalQty,rateState:0,note:note})},
+  findCodeML(t,y,c){const r=s=>this.removeAccents(s).trim(),k=r(t),x=r(String(c||'')),noise=/^(bich|goi|hu|tui|thung|chai|lo|hop|cai|chiec|vi|loc|kg|g|gr|gram|ml|lit|l)\s+/;const k2=k.replace(noise,'').trim();const check=(i)=>{const term=r(i.term);return term==k||(k!==k2&&term==k2)};let m=this.mlData.find(i=>i.type==y&&check(i)&&r(String(i.dept||i.store||''))==x);if(!m&&x)m=this.mlData.find(i=>i.type==y&&check(i)&&!i.dept&&!i.store);if(!m)m=this.mlData.find(i=>check(i)&&r(String(i.dept||i.store||''))==x);if(!m&&x)m=this.mlData.find(i=>check(i)&&!i.dept&&!i.store);if(!m)m=this.mlData.find(i=>check(i));return m?{code:m.code}:{code:null}},
+  removeAccents(str){return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/?/g,"d").replace(/?/g,"D").toLowerCase()},
+  formatNumber(n){if(!n&&n!==0)return'0';const d=(this.dashboardMode==='AMT')?0:3;return new Intl.NumberFormat('vi-VN',{maximumFractionDigits:d}).format(n)},loadSalesPeriods(){if(this.tracePeriods.length>0)return;this.loading=true;google.script.run.withSuccessHandler(r=>{this.loading=false;this.tracePeriods=r}).getAvailableSalesPeriods()},parseUSNum(v){if(!v)return 0;if(typeof v==='number')return v;return parseFloat(String(v).replace(/,/g,''))||0},applyTraceSales(p){this.selectedTracePeriod=p;const c=this.dialogTrace.items.map(i=>i.code);this.loading=true;google.script.run.withSuccessHandler(m=>{this.loading=false;this.dialogTrace.items.forEach(i=>{const s=m[String(i.code)]||0;let u=0;if(i.raw_qty!==undefined)u=i.raw_qty;else u=this.parseUSNum(i.qty);this.$set(i,'salesQty',s);this.$set(i,'totalUsage',u*s)});this.showNotify(`?? r?p s? li?u b?n h?ng k?: ${p}`)}).getSalesQtyByPeriod(p,c)},renderTracePath(i){if(!i)return'';let s=i.path||'';if(i.nodes){s=i.nodes.map(n=>`(${n.qty}) ${n.name}`).join(' \u2794 ')}return s.split('\n').map(l=>{if(l.includes('BROKEN')||l.includes('C?NH B?O'))return`<span class="trace-broken-node">${l}</span>`;if(l.includes('B?T ??U:')){let sh=i.salesQty?`<span class="trace-sales-tag">B?N: ${this.formatNumber(i.salesQty)}</span>`:'';return`<div class="trace-product-header"><i aria-hidden="true" class="v-icon notranslate mdi mdi-pizza theme--dark cyan--text text--accent-2" style="font-size:16px;margin-right:8px"></i> ${i.name} ${sh}</div>`}let p=l.split(' \u2794 ');if(p.length>0){let last=p.pop(),sf='';if(i.salesQty!==undefined){let nQ=0,found=false,unit='';if(i.nodes&&i.nodes.length){let ln=i.nodes[i.nodes.length-1];if(ln.raw_qty!==undefined){nQ=ln.raw_qty;found=true}if(ln.unit)unit=' '+ln.unit}if(!found){const m=last.match(/\(([\d.,]+)\)/);if(m){let v=m[1];if(v.includes(',')&&!v.includes('.'))v=v.replace(',','.');nQ=parseFloat(v)||this.parseUSNum(m[1])}}let t=nQ*(i.salesQty||0);let t_fmt = this.formatNumber(t);sf=` <span class="trace-total-tag"> \u2248 T?NG: ${t_fmt}${unit} (L? THUY?T: ${this.formatNumber(i.salesQty)} x ${this.formatNumber(nQ)})</span>`}return p.join(' \u2794 ')+' \u2794 <span class="trace-last-node">'+last+'</span>'+sf}return l}).join('\n')},
+  customFilterMaster(value,search,item){if(!search)return true;const s=this.removeAccents(search);return this.removeAccents(item.name).includes(s)||String(item.code).includes(s)},
+  onMasterItemSelect(val){if(val)this.editingItem.code=val.code},
+  openEditDialog(item,type,isSpoilageContext=false){this.editingItem={term:item.originalKeyword||item.term,code:item.internalCode||item.code,originalCode:item.internalCode||item.code,context:item.storeName||item.dept||item.store||item.context||'',sender:item.sender||'',type:type,isSpoilage:isSpoilageContext,originalTerm:item.term,originalContext:item.storeName||item.dept||item.store||item.context||'',originalType:type,originalRef:item};if(isSpoilageContext){this.editingItem.context=this.spoilageDept}this.dialogEdit=true},
+  saveEdit(){const payload={term:this.editingItem.term,code:this.editingItem.code,context:this.editingItem.context,type:this.editingItem.type};if(this.editingItem.originalRef){this.editingItem.originalRef.code=this.editingItem.code;if(this.editingItem.context&&!this.editingItem.isSpoilage)this.editingItem.originalRef.storeName=this.editingItem.context;if(this.editingItem.sender&&!this.editingItem.isSpoilage)this.editingItem.originalRef.sender=this.editingItem.sender}this.loading=true;if(this.editingItem.originalTerm){const delPayload={term:this.editingItem.originalTerm,code:this.editingItem.originalCode,type:this.editingItem.originalType};google.script.run.updateSystemData('DELETE_ML',delPayload)}google.script.run.withSuccessHandler(res=>{this.loading=false;this.showNotify(res.message);this.dialogEdit=false;this.loadSystemData()}).updateSystemData('ADD_ML',payload)},
+  requestDeleteMapping(item){const payload={term:item.term,code:item.code,type:item.type};this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;this.showNotify(res.message);this.dialogEdit=false;this.loadSystemData()}).updateSystemData('DELETE_ML',payload)},
+  handleMasterDbClick(e,row){if(this.canHaveBOM(row.item))this.openBOMEditor(row.item)},
+  canHaveBOM(item){return item.type==='SEMI'||item.type==='PROD'||String(item.code).length<5},
+  openBOMEditor(item){this.currentBOMItem=item;if(item.type==='PROD')this.currentBOMItem.sourceSheet='Danh m?c Product';else if(item.sourceSheet)this.currentBOMItem.sourceSheet=item.sourceSheet;else this.currentBOMItem.sourceSheet=this.sheetConfig.kit;this.bomIngredients=[];this.dialogBOM=true;this.getBOMDetail(item.code)},
+  getBOMDetail(code){google.script.run.withSuccessHandler(res=>{this.bomHeader=res.header;this.bomIngredients=res.details.map(d=>({...d,code:String(d.code)}))}).getBOMDetail(code,this.currentBOMItem.sourceSheet)},
+  fillBomInfo(ing,val){if(val){const found=this.masterData.find(m=>m.code==val);if(found){ing.name=found.name;ing.unit=found.unit}}},
+  addIngRow(){this.bomIngredients.push({qty:0,unit:'Gr',code:'',name:''})},
+  saveBOM(){const payload={itemCode:this.currentBOMItem.code,itemName:this.currentBOMItem.name,yield:this.bomHeader.yield,yieldUnit:this.bomHeader.unit,sourceSheet:this.currentBOMItem.sourceSheet,ingredients:this.bomIngredients};this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.showNotify(res.message);this.dialogBOM=false;const itemInList=this.masterData.find(m=>m.code==this.currentBOMItem.code);if(itemInList){itemInList.cost=res.newCost;itemInList.batchPrice=res.newBatchPrice;itemInList.yield=payload.yield}}else{this.showNotify('L?i l?u BOM','error')}}).saveBOM(payload)},
+  rowClassSpoilage(item){if(!item.code)return'row-indicator-unknown';if(item.itemType==='PROD')return'row-indicator-prod';if(item.itemType==='SEMI')return'row-indicator-semi';return'row-indicator-nvl'},
+  rowClassTransfer(item){return!item.code?'row-indicator-unknown':''},
+  rowClassHistory(item){let classes=[];if(item.type==='IN')classes.push('row-in');else if(item.type==='OUT')classes.push('row-out');if(item.status)classes.push('row-completed');return classes.join(' ')},
+  handleSpoilageRowDbClick(e,row){const item=row.item||row;let suggestType='ML_NVL';if(item.itemType==='PROD'||['ba','bon','nam'].includes(item.originalKeyword))suggestType='ML_PROD';else if(item.itemType==='SEMI')suggestType='ML_SEMI';this.openEditDialog(item,suggestType,true)},
+  getMasterName(c){const f=this.masterData.find(m=>m.code==c);return f?f.name:''},
+  deleteRow(item){const idx=this.parsedSpoilageData.indexOf(item);if(idx>-1)this.parsedSpoilageData.splice(idx,1)},
+  openConfirm(title,text,action,payload){this.dialogConfirm={show:true,title,text,action,payload}},
+  normalizeKey(str){if(!str)return'';return this.removeAccents(str).toLowerCase().replace(/[^a-z0-9]/g,'')},
+  setRateMode(item,mode){if(item.rateState===mode){item.rateState=0}else if(item.rateState===1&&mode===2){item.rateState=3}else{item.rateState=mode}this.recalcQty(item)},
+  recalcQty(item){const r=parseFloat(item.rate)||1;const b=parseFloat(item.originalQty)||0;if(item.rateState===1){item.qty=b*r;item.unit=item.baseUnit||item.originalUnit}else if(item.rateState===2){item.qty=b/r;item.unit=item.standardUnit}else if(item.rateState===3){item.qty=b;item.unit=item.standardUnit}else{item.qty=b;item.unit=item.baseUnit||item.originalUnit;item.rateState=0}item.qty=parseFloat(item.qty.toFixed(3))},
+  syncOriginalQty(item){const currentQty=parseFloat(item.qty);const rate=parseFloat(item.factor||item.rate||1);if(isNaN(currentQty))return;if(item.rateState===2)item.originalQty=currentQty*rate;else item.originalQty=currentQty;this.recalcQty(item)},
+  openHistoryEdit(item){this.editedHistoryItem=JSON.parse(JSON.stringify(item));if(!this.editedHistoryItem.rate)this.editedHistoryItem.rate=1;if(this.editedHistoryItem.rateState===undefined)this.editedHistoryItem.rateState=0;this.dialogEditHistory=true},
+  saveFullEdit(){if(!this.editedHistoryItem.id)return this.showNotify('L?i ID','error');let finalOriginalQty=this.editedHistoryItem.qty;if(this.editedHistoryItem.rateState===2)finalOriginalQty=this.editedHistoryItem.qty*this.editedHistoryItem.rate;this.editedHistoryItem.originalQty=finalOriginalQty;this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.showNotify(res.message);this.dialogEditHistory=false;this.loadSystemData()}else this.showNotify(res.message,'error')}).updateTransferFull(this.editedHistoryItem)},
+  toggleHistoryStatus(item){item.status=!item.status;google.script.run.withSuccessHandler(()=>{this.showNotify(`?? c?p nh?t`)}).updateTransferStatus(item.id,item.status)},
+  onHistoryCodeChange(selectedMaster){if(!selectedMaster)return;this.editedHistoryItem.code=selectedMaster.code;this.editedHistoryItem.itemName=selectedMaster.name;this.editedHistoryItem.rate=selectedMaster.rate||1;if(this.editedHistoryItem.rateState===2){this.editedHistoryItem.unit=selectedMaster.standardUnit||selectedMaster.unit}else{this.editedHistoryItem.unit=selectedMaster.unit}},
+  requestSaveTransfer(){if(!this.parsedTransferData.length)return;this.openConfirm('L?u Transfer',`L?u ${this.parsedTransferData.length} d?ng?`,'SAVE_TRANSFER')},
+  executeSaveTransfer(){this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;this.parsedTransferData=[];this.showNotify(res.message)}).saveTransferData(JSON.parse(JSON.stringify(this.parsedTransferData)))},
+  requestSaveSpoilage(){if(!this.parsedSpoilageData.length)return;this.openConfirm('L?u H?y',`L?u ${this.parsedSpoilageData.length} d?ng?`,'SAVE_SPOILAGE')},
+  executeSaveSpoilage(){this.loading=true;const payload={date:this.spoilageDate,dept:this.spoilageDept,items:JSON.parse(JSON.stringify(this.parsedSpoilageData))};google.script.run.withSuccessHandler(res=>{this.loading=false;this.parsedSpoilageData=[];this.showNotify(res.message)}).saveSpoilageData(payload)},
+  saveModifiedHistoryRows(){const itemsToSave=this.modifiedHistoryItems;if(itemsToSave.length===0)return;this.loading=true;const payload=JSON.parse(JSON.stringify(itemsToSave));google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.showNotify(res.message);this.loadSystemData()}else{this.showNotify("L?i: "+res.message,'error')}}).updateHistoryBatch(payload)},
+  openMasterDialog(action,item=null){this.dialogMaster.action=action;if(action==='ADD'){let defaultType='NVL';if(this.masterSubTab===2)defaultType='PROD';this.dialogMaster.item={code:'',name:'',unit:'',rate:1,type:defaultType,stdUnit:'',supplier:'',leadtime:'',noDelivery:'',group:'',status:'Active',ingredients:[],dept:'Kitchen',yield:1,sapCode:'',category:'',class:'',cost:0,team:'',buyingPrice:0};this.suggestNextCode()}else{this.dialogMaster.item=JSON.parse(JSON.stringify(item));this.dialogMaster.item.originalCode=item.code;if(!this.dialogMaster.item.ingredients)this.$set(this.dialogMaster.item,'ingredients',[])}this.dialogMaster.show=true},
+  addMasterIngRow(){if(!this.dialogMaster.item.ingredients)this.$set(this.dialogMaster.item,'ingredients',[]);this.dialogMaster.item.ingredients.push({code:'',name:'',qty:0,unit:''})},
+  saveMasterData(){if(!this.dialogMaster.item.code||!this.dialogMaster.item.name)return this.showNotify('Thi?u th?ng tin b?t bu?c','error');this.loading=true;const payload={...this.dialogMaster.item};google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.showNotify(res.message);this.dialogMaster.show=false;this.loadSystemData()}else this.showNotify(res.message,'error')}).updateMasterData(this.dialogMaster.action,payload)},
+  requestDeleteMaster(item){this.itemToDelete=item;this.dialogConfirmMaster=true},
+  executeDeleteMaster(){this.dialogConfirmMaster=false;this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.showNotify(res.message);this.loadSystemData()}else this.showNotify(res.message,'error')}).deleteMasterData(this.itemToDelete)},
+  requestDeleteHistory(){this.openConfirm('X?A PHI?U L?CH S??',`B?n mu?n x?a v?nh vi?n d?ng nh?p ng?y ${this.editedHistoryItem.date}?`,'DELETE_HISTORY_ROW')},
+  executeDeleteHistory(){this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.showNotify(res.message);this.dialogEditHistory=false;this.loadSystemData()}else{this.showNotify(res.message,'error')}}).deleteTransferRow(this.editedHistoryItem.id)},
+  getSourceSheetName(type){return(type==='PROD')?'Danh m?c Product':'Danh m?c NVL'},
+  resetColumnWidths(){const defaults={'status':'60px','date':'100px','sender':'160px','type':'90px','store':'100px','code':'100px','itemName':'300px','qty':'90px','unit':'70px','rate':'80px','amount':'110px','team':'90px','actions_edit':'50px'};this.allHistoryHeaders.forEach(h=>{if(defaults[h.value]){h.width=defaults[h.value]}});this.saveHeadersToLocal();this.showNotify('?? kh?i ph?c ?? r?ng m?c ??nh')},
+
+  executeKaizenUpdate(){if(!this.kaizenInput)return;this.loading=true;google.script.run.withSuccessHandler(r=>{this.loading=false;if(r.success){this.showNotify(r.message,'success');this.dialogKaizen=false;this.kaizenInput=''}else{this.showNotify(r.message,'error')}}).appendKaizenRule(this.kaizenInput)},executeBrainReset(){if(!this.kaizenInput)return;if(prompt("?? C?NH B?O: X?A S?CH tri th?c c?? G? OK:")!=='OK')return;this.loading=true;google.script.run.withSuccessHandler(r=>{this.loading=false;this.showNotify(r.message,r.success?'success':'error');if(r.success){this.dialogKaizen=false;this.kaizenInput=''}}).rewriteKaizenBrain(this.kaizenInput)},
+  /* [HANDLER] K?ch ho?t c?p nh?t gi? v?n h?ng lo?t t? Backend */
+  executeBulkUpdateCosts(){this.loading=true;google.script.run.withSuccessHandler(res=>{this.loading=false;if(res.success){this.showNotify(res.message,'success');this.loadSystemData()}else{this.showNotify(res.message,'error')}}).bulkUpdateSemiCosts()},
+  }});
+
+  </script>
