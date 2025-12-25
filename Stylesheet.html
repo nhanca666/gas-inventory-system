@@ -120,21 +120,18 @@ body{font-family:'Roboto',sans-serif;font-size:15px;overflow:hidden}
  
 
  
+.spoilage-table tbody tr {
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
 .spoilage-table tbody tr:hover {
-    background: #E3F2FD !important;
-    transform: scale(1.01);
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: #F0F4F8 !important;
 }
 
  
 .spoilage-table tbody tr:hover .v-icon {
-    animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+    opacity: 1;
+    transition: opacity 0.2s ease;
 }
 
  
@@ -147,5 +144,27 @@ body{font-family:'Roboto',sans-serif;font-size:15px;overflow:hidden}
 .spoilage-table th {
     font-size: 15px !important;
     font-weight: 900 !important;
+}
+
+ 
+.spoilage-table .v-data-table__wrapper {
+    overflow-y: scroll !important;
+    scrollbar-gutter: stable;
+}
+
+ 
+.spoilage-table .v-data-table__wrapper::-webkit-scrollbar {
+    width: 12px;
+    background: #F5F5F5;
+}
+
+.spoilage-table .v-data-table__wrapper::-webkit-scrollbar-thumb {
+    background: #BDBDBD;
+    border-radius: 6px;
+    border: 2px solid #F5F5F5;
+}
+
+.spoilage-table .v-data-table__wrapper::-webkit-scrollbar-thumb:hover {
+    background: #9E9E9E;
 }
 </style>
