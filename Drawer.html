@@ -1,0 +1,49 @@
+  <v-navigation-drawer app v-model="drawer" :permanent="$vuetify.breakpoint.mdAndUp" width="250" color="blue-grey darken-4" dark class="elevation-5">
+  <div class="d-flex align-center px-4 py-4 blue-grey darken-4" style="border-bottom:1px solid rgba(255,255,255,0.1);height:70px">
+  <v-avatar size="40" color="teal accent-4" class="mr-3 elevation-2"><v-icon medium dark>mdi-rocket-launch</v-icon></v-avatar>
+  <div><div class="subtitle-1 font-weight-black white--text text-uppercase" style="letter-spacing:1px">ANALYST CENTER</div><div class="caption teal--text text--accent-3 font-weight-bold">V12.19 PRO</div></div>
+  </div>
+  <v-list nav dense class="mt-4">
+
+  <v-list-item-group v-model="activeTab" active-class="teal accent-4 white--text">
+  <v-list-item class="mb-2"><v-list-item-icon><v-icon>mdi-check-decagram</v-icon></v-list-item-icon><v-list-item-content><v-list-item-title class="subtitle-2 font-weight-bold">KI?M TRANSFER<div class="caption blue-grey--text text--lighten-3">TRANSFER CHECK</div></v-list-item-title></v-list-item-content></v-list-item>
+  <v-list-item link @click="activeTab = 1" :class="{'v-list-item--active': activeTab === 1}">
+      <v-list-item-action>
+          <v-icon color="deep-orange lighten-2">mdi-trash-can-outline</v-icon>
+      </v-list-item-action>
+      <v-list-item-content>
+          <v-list-item-title class="font-weight-bold deep-orange--text text--lighten-2">
+              NH?P H?Y
+          </v-list-item-title>
+      </v-list-item-content>
+  </v-list-item>
+
+  <v-list-item link @click="activeTab = 2" class="pl-8" :class="{'v-list-item--active': activeTab === 2}">
+      <v-list-item-action>
+          <v-icon small color="cyan accent-3">mdi-chart-line-variant</v-icon>
+      </v-list-item-action>
+      <v-list-item-content>
+          <v-list-item-title class="cyan--text text--accent-3" style="font-size: 13px; font-weight: 500;">
+              L?CH S? & P&L
+          </v-list-item-title>
+      </v-list-item-content>
+  </v-list-item>
+
+  <v-list-item class="mb-2"><v-list-item-icon><v-icon>mdi-database</v-icon></v-list-item-icon><v-list-item-content><v-list-item-title class="subtitle-2 font-weight-bold">MASTER & BOM</v-list-item-title></v-list-item-content></v-list-item>
+  <v-list-item class="mb-2"><v-list-item-icon><v-icon>mdi-robot</v-icon></v-list-item-icon><v-list-item-content><v-list-item-title class="subtitle-2 font-weight-bold">AI TRAINING</v-list-item-title></v-list-item-content></v-list-item>
+  <v-list-item class="mb-2"><v-list-item-icon><v-icon>mdi-history</v-icon></v-list-item-icon><v-list-item-content><v-list-item-title class="subtitle-2 font-weight-bold">L?CH S? GD</v-list-item-title></v-list-item-content></v-list-item>
+  <v-list-item class="mb-2" @click="dialogConfirm={show:true,title:'X?c nh?n',text:'T?nh to?n l?i to?n b? gi? v?n Semi d?a tr?n gi? NVL m?i nh?t?',action:'executeBulkUpdateCosts'}">
+    <v-list-item-icon><v-icon color="orange lighten-1">mdi-calculator-variant</v-icon></v-list-item-icon>
+    <v-list-item-content>
+      <v-list-item-title class="subtitle-2 font-weight-bold orange--text text--lighten-1">C?P NH?T GI? BOM</v-list-item-title>
+    </v-list-item-content>
+  </v-list-item>
+  </v-list-item-group>
+  </v-list>
+  <template v-slot:append>
+  <div class="pa-3 blue-grey darken-4">
+  <v-btn block text color="grey lighten-1" @click="syncDB" class="font-weight-bold mb-2"><v-icon left small color="green accent-3">mdi-database-sync</v-icon> ??NG B? DB</v-btn>
+  <v-btn block color="teal darken-3" dark depressed @click="dialogKaizen=true" class="font-weight-bold"><v-icon left small>mdi-brain</v-icon> AI BRAIN</v-btn>
+  </div>
+  </template>
+  </v-navigation-drawer>
