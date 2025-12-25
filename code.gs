@@ -22,7 +22,7 @@ const CONFIG = {
 // ?? THIS IS A MIRROR - DO NOT EDIT DIRECTLY
 // Edit in Apps Script, then run pushToGitHub()
 
-// Last sync: 2025-12-25T02:59:55.930Z
+// Last sync: 2025-12-25T03:11:58.728Z
 
 // ============ doGet ============
 function doGet(e) {
@@ -37,35 +37,36 @@ function doGet(e) {
   
   // [TH?M M?I] - API tr? code (d?ng 40-66)
   if (e.parameter.action === 'getCode') {
+  const baseUrl = `https://raw.githubusercontent.com/${GITHUB_CONFIG.REPO}/${GITHUB_CONFIG.BRANCH}`;
+  
   const fileMap = {
-    // Backend - Placeholder v? kh?ng ??c ???c .gs file
-    'Backend': `/* 
- * CODE BACKEND (code.gs)
- * ?? xem full code, vui l?ng t?o file Backend.html
- * ho?c xem tr?c ti?p trong Apps Script Editor.
- * 
- * Script ID: ${ScriptApp.getScriptId()}
- * Version: V12.19
- */`,
-    
-    // C?c file HTML (GI? NGUY?N)
-    'Drawer': getFileContent('Drawer'),
-    'Footer': getFileContent('Footer'),
-    'Index': getFileContent('Index'),
-    'Javascript': getFileContent('Javascript'),
-    'main': getFileContent('main'),
-    'section': getFileContent('section'),
-    'Stylesheet': getFileContent('Stylesheet')
+    'Backend': `${baseUrl}/code.gs`,
+    'Drawer': `${baseUrl}/Drawer.html`,
+    'Footer': `${baseUrl}/Footer.html`,
+    'Index': `${baseUrl}/Index.html`,
+    'Javascript': `${baseUrl}/Javascript.html`,
+    'main': `${baseUrl}/main.html`,
+    'section': `${baseUrl}/section.html`,
+    'Stylesheet': `${baseUrl}/Stylesheet.html`
   };
   
   const requestedFile = e.parameter.file || 'Backend';
-  const content = fileMap[requestedFile] || 'File not found';
+  const fileUrl = fileMap[requestedFile];
   
+  if (!fileUrl) {
+    return ContentService
+      .createTextOutput(JSON.stringify({error: 'File not found'}, null, 2))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // Tr? v? URL thay v? content (Claude s? fetch tr?c ti?p)
   const response = {
     file: requestedFile,
-    content: content,
+    url: fileUrl,
+    content: `// Redirect to: ${fileUrl}`,
     timestamp: new Date().toISOString(),
-    version: 'V12.19'
+    version: 'V12.19',
+    repo: GITHUB_CONFIG.REPO
   };
   
   return ContentService
