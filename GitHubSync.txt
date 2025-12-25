@@ -1,0 +1,394 @@
+/**
+ * ========================================
+ * GITHUB SYNC MODULE - STANDALONE
+ * ========================================
+ * File riêng: GitHubSync.gs
+ * 
+ * Chức năng:
+ * - Push HTML/JS/CSS files lên GitHub tự động
+ * - Test connection
+ * - View commit history
+ * - code.gs được cập nhật thủ công
+ * 
+ * Cách sử dụng:
+ * 1. Tạo file mới: GitHubSync.gs
+ * 2. Copy toàn bộ code này vào
+ * 3. Chạy GitHubSync.push() để sync
+ * ========================================
+ */
+
+/**
+ * ⚙️ CẤU HÌNH GITHUB
+ * Điền thông tin repo của bạn vào đây
+ */
+const GITHUB_CONFIG = {
+  OWNER: "nhanca666",
+  TOKEN: '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', // ⚠️ NÊN LƯU VÀO Script Properties
+  REPO: 'gas-inventory-system',
+  BRANCH: 'main',
+  
+  // Danh sách file sẽ được push tự động
+  FILES_TO_SYNC: [
+    'Index.html',
+    'Drawer.html',
+    'Footer.html',
+    'Javascript.html',
+    'main.html',
+    'section.html',
+    'Stylesheet.html'
+  ]
+};
+
+/**
+ * ========================================
+ * NAMESPACE: GitHubSync
+ * Tất cả functions đều nằm trong object này
+ * ========================================
+ */
+const GitHubSync = {
+  
+  /**
+   * HÀM CHÍNH: PUSH HTML FILES LÊN GITHUB
+   * Gọi: GitHubSync.push()
+   */
+  push: function() {
+    try {
+      const ui = SpreadsheetApp.getUi();
+      
+      // Xác nhận
+      const confirm = ui.alert(
+        '🚀 Push to GitHub', 
+        `Sẽ push ${GITHUB_CONFIG.FILES_TO_SYNC.length} files HTML lên GitHub.\n\n` +
+        '📝 code.gs KHÔNG được push tự động.\n\n' +
+        'Tiếp tục?', 
+        ui.ButtonSet.YES_NO
+      );
+      
+      if (confirm !== ui.Button.YES) {
+        ui.alert('❌ Đã hủy');
+        return { success: false, message: 'Cancelled by user' };
+      }
+      
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        '📄 Đang đọc files...', 
+        'GitHub Sync', 
+        3
+      );
+      
+      let successCount = 0;
+      let errorFiles = [];
+      const timestamp = new Date().toISOString();
+      
+      // Push từng file
+      GITHUB_CONFIG.FILES_TO_SYNC.forEach(fileName => {
+        try {
+          SpreadsheetApp.getActiveSpreadsheet().toast(
+            `📤 ${fileName}...`, 
+            'Pushing', 
+            2
+          );
+          
+          // Đọc nội dung
+          const content = HtmlService.createHtmlOutputFromFile(
+            fileName.replace('.html', '')
+          ).getContent();
+          
+          // Push
+          const result = GitHubSync._pushSingleFile(fileName, content, timestamp);
+          
+          if (result.success) {
+            successCount++;
+          } else {
+            errorFiles.push(`${fileName}: ${result.message}`);
+          }
+          
+          // Delay tránh rate limit
+          Utilities.sleep(500);
+          
+        } catch (e) {
+          errorFiles.push(`${fileName}: ${e.toString()}`);
+        }
+      });
+      
+      // Thông báo kết quả
+      const totalFiles = GITHUB_CONFIG.FILES_TO_SYNC.length;
+      
+      if (successCount === totalFiles) {
+        ui.alert(
+          '✅ Push thành công!', 
+          `Đã push ${successCount}/${totalFiles} files.\n\n` +
+          `📅 ${timestamp}\n` +
+          `🔗 github.com/${GITHUB_CONFIG.OWNER}/${GITHUB_CONFIG.REPO}\n\n` +
+          `📝 Nhớ cập nhật code.gs thủ công khi có thay đổi!`, 
+          ui.ButtonSet.OK
+        );
+      } else {
+        ui.alert(
+          '⚠️ Push một phần', 
+          `Thành công: ${successCount}/${totalFiles}\n\n` +
+          `Lỗi:\n${errorFiles.join('\n')}`, 
+          ui.ButtonSet.OK
+        );
+      }
+      
+      return { 
+        success: true, 
+        pushed: successCount, 
+        failed: errorFiles.length,
+        errors: errorFiles 
+      };
+      
+    } catch (e) {
+      SpreadsheetApp.getUi().alert('❌ Lỗi: ' + e.toString());
+      return { success: false, message: e.toString() };
+    }
+  },
+  
+  /**
+   * HÀM PRIVATE: PUSH 1 FILE
+   * Gọi nội bộ bởi GitHubSync.push()
+   */
+  _pushSingleFile: function(fileName, content, timestamp) {
+    try {
+      const apiBase = `https://api.github.com/repos/${GITHUB_CONFIG.OWNER}/${GITHUB_CONFIG.REPO}`;
+      
+      // 1. Lấy SHA file hiện tại (nếu có)
+      let currentSHA = null;
+      try {
+        const getUrl = `${apiBase}/contents/${fileName}?ref=${GITHUB_CONFIG.BRANCH}`;
+        const getResponse = UrlFetchApp.fetch(getUrl, {
+          headers: {
+            'Authorization': `token ${GITHUB_CONFIG.TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+          },
+          muteHttpExceptions: true
+        });
+        
+        if (getResponse.getResponseCode() === 200) {
+          currentSHA = JSON.parse(getResponse.getContentText()).sha;
+        }
+      } catch (e) {
+        // File chưa tồn tại
+      }
+      
+      // 2. Tạo payload
+      const payload = {
+        message: `[AUTO] Update ${fileName} - ${timestamp}`,
+        content: Utilities.base64Encode(content),
+        branch: GITHUB_CONFIG.BRANCH
+      };
+      
+      if (currentSHA) {
+        payload.sha = currentSHA;
+      }
+      
+      // 3. Push
+      const putUrl = `${apiBase}/contents/${fileName}`;
+      const putResponse = UrlFetchApp.fetch(putUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${GITHUB_CONFIG.TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      
+      const code = putResponse.getResponseCode();
+      
+      if (code === 200 || code === 201) {
+        return { success: true };
+      } else {
+        const error = JSON.parse(putResponse.getContentText());
+        return { success: false, message: error.message || 'Unknown error' };
+      }
+      
+    } catch (e) {
+      return { success: false, message: e.toString() };
+    }
+  },
+  
+  /**
+   * TEST CONNECTION
+   * Gọi: GitHubSync.test()
+   */
+  test: function() {
+    try {
+      const url = `https://api.github.com/repos/${GITHUB_CONFIG.OWNER}/${GITHUB_CONFIG.REPO}`;
+      const response = UrlFetchApp.fetch(url, {
+        headers: {
+          'Authorization': `token ${GITHUB_CONFIG.TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      
+      const repo = JSON.parse(response.getContentText());
+      
+      SpreadsheetApp.getUi().alert(
+        '✅ Kết nối thành công!',
+        `Repo: ${repo.full_name}\n` +
+        `Branch: ${GITHUB_CONFIG.BRANCH}\n` +
+        `Private: ${repo.private}\n` +
+        `Files to sync: ${GITHUB_CONFIG.FILES_TO_SYNC.length}\n` +
+        `Last push: ${repo.pushed_at}`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      
+      return { success: true };
+      
+    } catch (e) {
+      SpreadsheetApp.getUi().alert(
+        '❌ Lỗi kết nối',
+        `${e.toString()}\n\n` +
+        '💡 Kiểm tra:\n' +
+        '1. Token còn hiệu lực?\n' +
+        '2. Token có quyền "repo"?\n' +
+        '3. Repo name đúng?',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      
+      return { success: false, message: e.toString() };
+    }
+  },
+  
+  /**
+   * XEM COMMIT MỚI NHẤT
+   * Gọi: GitHubSync.viewLatestCommit()
+   */
+  viewLatestCommit: function() {
+    try {
+      const url = `https://api.github.com/repos/${GITHUB_CONFIG.OWNER}/${GITHUB_CONFIG.REPO}/commits?per_page=1`;
+      const response = UrlFetchApp.fetch(url, {
+        headers: {
+          'Authorization': `token ${GITHUB_CONFIG.TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      
+      const commits = JSON.parse(response.getContentText());
+      const latest = commits[0];
+      
+      SpreadsheetApp.getUi().alert(
+        '📝 Latest Commit',
+        `SHA: ${latest.sha.substring(0, 7)}\n` +
+        `Message: ${latest.commit.message}\n` +
+        `Author: ${latest.commit.author.name}\n` +
+        `Date: ${latest.commit.author.date}`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+      
+      return {
+        sha: latest.sha,
+        message: latest.commit.message,
+        author: latest.commit.author.name,
+        date: latest.commit.author.date
+      };
+      
+    } catch (e) {
+      SpreadsheetApp.getUi().alert('❌ Không lấy được commit: ' + e.toString());
+      return null;
+    }
+  },
+  
+  /**
+   * LẤY DANH SÁCH FILES SẼ PUSH
+   * Gọi: GitHubSync.listFiles()
+   */
+  listFiles: function() {
+    const files = GITHUB_CONFIG.FILES_TO_SYNC.map((name, index) => 
+      `${index + 1}. ${name}`
+    ).join('\n');
+    
+    SpreadsheetApp.getUi().alert(
+      '📁 Files sẽ được push',
+      `Tổng: ${GITHUB_CONFIG.FILES_TO_SYNC.length} files\n\n${files}\n\n` +
+      '📝 code.gs KHÔNG được push tự động.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  },
+  
+  /**
+   * CẤU HÌNH TOKEN AN TOÀN
+   * Lưu token vào Script Properties thay vì hardcode
+   * Gọi: GitHubSync.setupToken('your_token_here')
+   */
+  setupToken: function(token) {
+    if (!token) {
+      SpreadsheetApp.getUi().alert('❌ Token không được rỗng!');
+      return;
+    }
+    
+    PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
+    
+    SpreadsheetApp.getUi().alert(
+      '✅ Đã lưu token!',
+      'Token được lưu an toàn vào Script Properties.\n\n' +
+      'Bây giờ bạn có thể xóa token trong code.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  },
+  
+  /**
+   * LẤY TOKEN TỪ PROPERTIES (AN TOÀN HƠN)
+   */
+  _getToken: function() {
+    const stored = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+    return stored || GITHUB_CONFIG.TOKEN;
+  }
+};
+
+/**
+ * ========================================
+ * MENU INTEGRATION
+ * Thêm vào menu chính của ứng dụng
+ * ========================================
+ */
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  
+  ui.createMenu('🚀 GITHUB SYNC')
+    .addItem('📤 Push HTML Files', 'menuPushToGitHub')
+    .addItem('🧪 Test Connection', 'menuTestConnection')
+    .addItem('📊 View Latest Commit', 'menuViewCommit')
+    .addItem('📁 List Files', 'menuListFiles')
+    .addSeparator()
+    .addItem('🔐 Setup Token', 'menuSetupToken')
+    .addToUi();
+}
+
+/**
+ * ========================================
+ * MENU HANDLERS
+ * Các hàm này gọi GitHubSync methods
+ * ========================================
+ */
+function menuPushToGitHub() {
+  GitHubSync.push();
+}
+
+function menuTestConnection() {
+  GitHubSync.test();
+}
+
+function menuViewCommit() {
+  GitHubSync.viewLatestCommit();
+}
+
+function menuListFiles() {
+  GitHubSync.listFiles();
+}
+
+function menuSetupToken() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    '🔐 Setup GitHub Token',
+    'Paste your GitHub Personal Access Token:\n\n' +
+    '💡 Token cần quyền "repo"',
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response.getSelectedButton() === ui.Button.OK) {
+    GitHubSync.setupToken(response.getResponseText());
+  }
+}
