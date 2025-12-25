@@ -401,13 +401,56 @@ formatQtyDisplay(val) {
 openExportDialog() {
     console.log('? [DEBUG] openExportDialog called');
     
+    
     if (!this.spoilageHistory || this.spoilageHistory.length === 0) {
-        this.showNotify('Kh?ng c? d? li?u ?? xu?t', 'warning');
+        this.showNotify('? ?ang t?i d? li?u...', 'info');
+        
+        
+        this.loading = true;
+        this.loadingText = '? ?ang t?i l?ch s? h?y h?ng...';
+        
+        
+        let fromDate = "01/12/2025";
+        let toDate = "31/12/2025";
+        
+        if (this.spoilageDate) {
+            const parts = this.spoilageDate.split('-');
+            if (parts.length === 2) {
+                const year = parts[0];
+                const month = parts[1];
+                fromDate = `01/${month}/${year}`;
+                const lastDay = new Date(year, month, 0).getDate();
+                toDate = `${lastDay}/${month}/${year}`;
+            }
+        }
+        
+        google.script.run
+            .withSuccessHandler((res) => {
+                this.loading = false;
+                if (res.success && res.data && res.data.length > 0) {
+                    this.spoilageHistory = res.data;
+                    this.showNotify(`? ?? t?i ${res.data.length} phi?u`, 'success');
+                    // M? dialog sau khi c? d? li?u
+                    this._openExportDialogReal();
+                } else {
+                    this.showNotify('?? Kh?ng c? d? li?u trong th?ng n?y', 'warning');
+                }
+            })
+            .withFailureHandler((err) => {
+                this.loading = false;
+                this.showNotify('? L?i: ' + err.message, 'error');
+            })
+            .getSpoilageHistory(fromDate, toDate);
+        
         return;
     }
     
-    console.log('? [DEBUG] Data count:', this.spoilageHistory.length);
     
+    this._openExportDialogReal();
+},
+
+
+_openExportDialogReal() {
     
     if (this.spoilageDate) {
         const parts = this.spoilageDate.split('-');
@@ -420,141 +463,77 @@ openExportDialog() {
         }
     }
     
-    console.log('? [DEBUG] Opening dialog...');
+    console.log('? [DEBUG] Opening dialog with', this.spoilageHistory.length, 'items');
     this.dialogExportExcel = true;
 },
 
 confirmExportExcel() {
     console.log('? [DEBUG] confirmExportExcel called');
-    console.log('? [DEBUG] Config:', this.exportConfig);
     
     this.dialogExportExcel = false;
     this.loading = true;
     this.loadingText = '? ?ang chu?n b? d? li?u...';
-    
-    const shouldExplodeBOM = this.exportConfig.explodeBOM === true;
-    const unitMode = this.exportConfig.unitMode || 'ORIGINAL';
-    
+
     
     let filteredData = this.spoilageHistory.filter(item => 
         this.exportConfig.itemTypes.includes(item.type)
     );
     
-    console.log('? [DEBUG] Filtered data count:', filteredData.length);
-    console.log('? [DEBUG] Explode BOM:', shouldExplodeBOM);
+    console.log('? [DEBUG] Filtered:', filteredData.length);
+
     
-    
-    let exportData = [];
-    
-    if (shouldExplodeBOM) {
+    const exportData = filteredData.map(item => ({
+        code: String(item.code || '').trim(),
+        name: String(item.name || ''),
+        qty: Number(item.qty) || 0,
+        unit: String(item.unit || ''),
+        amount: Number(item.amount) || 0,
+        dept: String(item.dept || ''),
+        note: String(item.note || ''),
+        date: String(item.date || ''),
+        type: String(item.type || 'NVL').toUpperCase()
         
-        
-        filteredData.forEach(item => {
-            const itemType = item.type || 'NVL';
-            
-            if (itemType === 'NVL') {
-                
-                exportData.push({
-                    code: this.formatItemCodeVN(item.code),
-                    name: item.name,
-                    qty: item.qty,
-                    unit: item.unit,
-                    amount: item.amount || 0,
-                    dept: item.dept || '',
-                    note: item.note || '',
-                    date: item.date || '',
-                    type: 'NVL',
-                    originalCode: '',
-                    originalName: '',
-                    needExplode: false
-                });
-            } else {
-                
-                exportData.push({
-                    code: this.formatItemCodeVN(item.code),
-                    name: item.name,
-                    qty: item.qty,
-                    unit: item.unit,
-                    amount: item.amount || 0,
-                    dept: item.dept || '',
-                    note: item.note || '',
-                    date: item.date || '',
-                    type: itemType,
-                    originalCode: item.code,
-                    originalName: item.name,
-                    needExplode: true  
-                });
-            }
-        });
-    } else {
-        
-        exportData = filteredData.map(item => ({
-            code: this.formatItemCodeVN(item.code),
-            name: item.name,
-            qty: item.qty,
-            unit: item.unit,
-            amount: item.amount || 0,
-            dept: item.dept || '',
-            note: item.note || '',
-            date: item.date || '',
-            type: item.type || 'NVL',
-            originalCode: '',
-            originalName: '',
-            needExplode: false
-        }));
-    }
-    
-    console.log('? [DEBUG] Export data count:', exportData.length);
-    console.log('? [DEBUG] Calling Backend...');
+    }));
+
+    console.log('? [DEBUG] Calling Backend with', exportData.length, 'items');
     
     
     this.pollExportProgress();
-    
-    
+
     google.script.run
         .withSuccessHandler((res) => {
-            console.log('? [DEBUG] Backend response:', res);
+            console.log('? [DEBUG] Response:', res);
             this.loading = false;
+            this.loadingText = '';
             clearInterval(this.exportProgressInterval);
             
             if (res.success) {
                 window.open(res.url, '_blank');
-                this.showNotify('? ' + res.message, 'success');
+                this.showNotify(`? ${res.message}`, 'success');
             } else {
                 this.showNotify(res.message, 'error');
             }
         })
         .withFailureHandler((err) => {
-            console.error('? [DEBUG] Backend error:', err);
+            console.error('? [DEBUG] Error:', err);
             this.loading = false;
+            this.loadingText = '';
             clearInterval(this.exportProgressInterval);
             this.showNotify('L?i: ' + err.message, 'error');
         })
         .exportSpoilageToExcel(exportData, this.exportConfig);
 },
 
-
-formatItemCodeVN(code) {
-    if (!code) return '';
-    let codeStr = String(code).trim();
-    
-    if (/^\d+\.\d+$/.test(codeStr)) {
-        codeStr = codeStr.replace('.', ',');
-    }
-    return codeStr;
-},
-
-
 pollExportProgress() {
     this.exportProgressInterval = setInterval(() => {
         google.script.run
             .withSuccessHandler((progress) => {
                 if (progress) {
-                    this.loadingText = progress; 
+                    this.loadingText = progress;
                 }
             })
             .getExportProgress();
-    }, 1000); 
+    }, 800);
 },
    
   getSpoilageHistory() {
