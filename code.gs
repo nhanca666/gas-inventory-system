@@ -1585,162 +1585,213 @@ function getSpoilageHistory(fromDateStr, toDateStr) {
     return { success: true, data: results.sort((a,b) => parseDateVN(b.date) - parseDateVN(a.date)) };
   } catch (e) { return { success: false, message: "Lỗi: " + e.toString() }; }
 }
-// ============ exportSpoilageToExcel ============
-// Xuất báo cáo hủy hàng ra Excel - Lưu vào folder cố định
-// Layout: Cột A-D = Hợp lệ | Cột F+ = Lỗi cần kiểm tra
+// ============ exportSpoilageToExcel V2 - FIXED ============
 function exportSpoilageToExcel(data, config) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const cache = CacheService.getScriptCache();
     const shouldExplodeBOM = config.explodeBOM === true;
     const unitMode = config.unitMode || 'ORIGINAL';
-    
-    // FOLDER ID cố định để lưu file
     const FOLDER_ID = '1OAiOKp4HbLIXDKzlo4IkOrGFX2wjCvuM';
     
-    // 1. TẠO MAP MASTER DATA
+    cache.put('EXPORT_PROGRESS', '⏳ Đang tải Master Data...', 300);
+    
+    // 1. TẠO MAP MASTER DATA (Bao gồm cả SEMI)
     const masterMap = new Map();
+    
+    // Load NVL
     const sheetNVL = ss.getSheetByName(CONFIG.SHEET_NVL);
     if (sheetNVL) {
       sheetNVL.getDataRange().getValues().slice(1).forEach(r => {
         const code = String(r[1]).trim();
         if (code) {
           masterMap.set(code, {
-            name: String(r[0]),
-            unit: String(r[2]),
-            cost: Number(r[3]) || 0,
-            stdUnit: String(r[4]),
-            rate: Number(r[5]) || 1
+            name: String(r[0]), unit: String(r[2]), cost: Number(r[3]) || 0,
+            stdUnit: String(r[4]) || String(r[2]), rate: Number(r[5]) || 1, type: 'NVL'
           });
         }
       });
     }
     
-    // 2. XỬ LÝ DỮ LIỆU - CHIA 2 NHÓM
-    const validRows = [];   // Cột A-D: Hợp lệ
-    const errorRows = [];   // Cột F+: Lỗi
+    // Load SEMI (từ 3 sheet)
+    [CONFIG.SHEET_KIT_KITCHEN, CONFIG.SHEET_KIT_PIZZA, CONFIG.SHEET_KIT_SERVICE].forEach(sheetName => {
+      const s = ss.getSheetByName(sheetName);
+      if (s) {
+        s.getDataRange().getValues().slice(1).forEach(r => {
+          if (String(r[1]).toLowerCase() === 'parent') {
+            const code = String(r[0]).trim();
+            if (code && !masterMap.has(code)) {
+              masterMap.set(code, {
+                name: String(r[3]), unit: String(r[5]), cost: Number(r[6]) || 0,
+                stdUnit: String(r[5]), rate: 1, type: 'SEMI'
+              });
+            }
+          }
+        });
+      }
+    });
     
-    data.forEach(item => {
-      const needExplode = item.needExplode === true;
-      const itemType = item.type || 'NVL';
+    cache.put('EXPORT_PROGRESS', '🔄 Đang xử lý ' + data.length + ' dòng...', 300);
+    
+    // 2. XỬ LÝ DỮ LIỆU
+    const validRows = [];
+    const errorRows = [];
+    
+    data.forEach((item, idx) => {
+      if (idx % 50 === 0) {
+        cache.put('EXPORT_PROGRESS', `🔄 Đang xử lý ${idx}/${data.length}...`, 300);
+      }
       
-      // TRƯỜNG HỢP 1: Cần bung BOM (SEMI/PROD)
-      if (needExplode && shouldExplodeBOM) {
+      const itemCode = String(item.code || '').trim().replace(',', '.');
+      const itemType = String(item.type || 'NVL').toUpperCase();
+      const itemName = String(item.name || '');
+      const itemQty = Number(item.qty) || 0;
+      const itemUnit = String(item.unit || '');
+      
+      // [FIX 1] Xác định needExplode từ type
+      const needExplode = (itemType === 'SEMI' || itemType === 'PROD') && shouldExplodeBOM;
+      
+      // TRƯỜNG HỢP 1: Cần bung BOM
+      if (needExplode) {
         const sheetSemiSpoilage = ss.getSheetByName(CONFIG.SHEET_SPOILAGE_SEMI);
-        if (sheetSemiSpoilage) {
+        let foundExploded = false;
+        
+        if (sheetSemiSpoilage && sheetSemiSpoilage.getLastRow() > 1) {
           const semiData = sheetSemiSpoilage.getDataRange().getValues().slice(1);
-          let foundExploded = false;
           
           semiData.forEach(row => {
             const nvlCode = String(row[1]).trim();
             const nvlQty = Number(row[6]) || 0;
             const nvlNote = String(row[10] || '');
-            const nvlDept = String(row[11] || '');
             
-            if (nvlNote.includes('Bung từ') && 
-                (nvlNote.includes(item.originalName) || nvlNote.includes(String(item.qty)))) {
-              
+            // [FIX 2] Logic tìm kiếm cải tiến - tìm theo tên item
+            const searchName = itemName.toLowerCase().trim();
+            const noteLC = nvlNote.toLowerCase();
+            
+            if (noteLC.includes('bung từ') && noteLC.includes(searchName)) {
               const nvlMaster = masterMap.get(nvlCode);
               let displayQty = nvlQty;
               let displayUnit = nvlMaster ? nvlMaster.unit : '';
               
+              // Quy đổi đơn vị nếu cần
               if (unitMode === 'CONVERTED' && nvlMaster && nvlMaster.rate > 1) {
                 displayQty = nvlQty / nvlMaster.rate;
                 displayUnit = nvlMaster.stdUnit || displayUnit;
               }
               
               const finalCode = formatCodeVN(nvlCode);
-              const finalUnit = displayUnit;
-              const finalName = nvlMaster ? nvlMaster.name : item.originalName;
+              const finalName = nvlMaster ? nvlMaster.name : nvlCode;
               
-              // VALIDATION
-              if (!finalCode || finalCode === '' || !finalUnit || finalUnit === '') {
-                let errReason = !finalCode ? 'THIẾU MÃ HÀNG' : 'THIẾU ĐƠN VỊ TÍNH';
-                errorRows.push([finalCode, finalName, finalUnit, roundNum(displayQty, 3), errReason]);
+              // [FIX 3] Validation với fallback
+              if (!finalCode || finalCode === '') {
+                errorRows.push([finalCode || '(trống)', finalName, displayUnit, roundNum(displayQty, 3), 'THIẾU MÃ HÀNG']);
+              } else if (!displayUnit || displayUnit === '') {
+                errorRows.push([finalCode, finalName, '(trống)', roundNum(displayQty, 3), 'THIẾU ĐƠN VỊ TÍNH']);
               } else {
-                validRows.push([finalCode, finalName, finalUnit, roundNum(displayQty, 3)]);
+                validRows.push([finalCode, finalName, displayUnit, roundNum(displayQty, 3)]);
               }
               foundExploded = true;
             }
           });
-          
-          if (!foundExploded) {
-            errorRows.push([formatCodeVN(item.code), item.name, item.unit, item.qty, 'CHƯA CÓ BOM']);
-          }
+        }
+        
+        // Nếu không tìm thấy BOM đã bung → Báo lỗi
+        if (!foundExploded) {
+          errorRows.push([formatCodeVN(itemCode), itemName, itemUnit || '(trống)', itemQty, 'CHƯA CÓ BOM BUNG']);
         }
       }
-      // TRƯỜNG HỢP 2: Không cần bung
+      // TRƯỜNG HỢP 2: Không cần bung (NVL hoặc không tick Bung BOM)
       else {
-        const master = masterMap.get(String(item.code).replace(',', '.'));
-        let displayQty = item.qty;
-        let displayUnit = item.unit || (master ? master.unit : '');
+        const master = masterMap.get(itemCode);
+        let displayQty = itemQty;
+        let displayUnit = itemUnit || (master ? master.unit : '');
         
+        // Quy đổi đơn vị
         if (unitMode === 'CONVERTED' && master && master.rate > 1) {
-          displayQty = item.qty / master.rate;
+          displayQty = itemQty / master.rate;
           displayUnit = master.stdUnit || displayUnit;
         }
         
-        const finalCode = formatCodeVN(item.code);
-        const finalUnit = displayUnit;
+        const finalCode = formatCodeVN(itemCode);
         
-        // VALIDATION
-        if (!finalCode || finalCode === '' || !finalUnit || finalUnit === '') {
-          let errReason = !finalCode ? 'THIẾU MÃ HÀNG' : 'THIẾU ĐƠN VỊ TÍNH';
-          errorRows.push([finalCode, item.name, finalUnit, roundNum(displayQty, 3), errReason]);
+        // [FIX 4] Validation rõ ràng hơn
+        if (!finalCode || finalCode === '') {
+          errorRows.push(['(trống)', itemName, displayUnit || '(trống)', roundNum(displayQty, 3), 'THIẾU MÃ HÀNG']);
+        } else if (!displayUnit || displayUnit === '') {
+          errorRows.push([finalCode, itemName || '(không tên)', '(trống)', roundNum(displayQty, 3), 'THIẾU ĐƠN VỊ TÍNH']);
         } else {
-          validRows.push([finalCode, item.name, finalUnit, roundNum(displayQty, 3)]);
+          validRows.push([finalCode, itemName, displayUnit, roundNum(displayQty, 3)]);
         }
       }
     });
     
+    cache.put('EXPORT_PROGRESS', '📝 Đang tạo file Excel...', 300);
+    
     // 3. TẠO FILE EXCEL
-    const dateStr = config.fromDate ? config.fromDate.replace(/-/g, '') : new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const now = new Date();
+    const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyyMMdd_HHmm');
     const suffix = shouldExplodeBOM ? '_BUNG_BOM' : '';
-    const unitSuffix = unitMode === 'CONVERTED' ? '_CONVERTED' : '';
+    const unitSuffix = unitMode === 'CONVERTED' ? '_QUY_DOI' : '_GOC';
     const fileName = 'HUY_HANG_SAP_' + dateStr + unitSuffix + suffix;
     
     const newSS = SpreadsheetApp.create(fileName);
     const sheet = newSS.getActiveSheet();
     sheet.setName('Import SAP');
     
-    // 4. GHI DỮ LIỆU THEO LAYOUT MỚI
-    // Header cột A-D (Hợp lệ)
+    // 4. GHI DỮ LIỆU
+    // Header bảng HỢP LỆ (A-D) - Xanh
     const validHeaders = ['ItemCode', 'ItemName', 'UomCode', 'Quantity'];
-    sheet.getRange(1, 1, 1, 4).setValues([validHeaders]);
-    sheet.getRange(1, 1, 1, 4).setBackground('#4CAF50').setFontColor('white').setFontWeight('bold');
+    sheet.getRange(1, 1, 1, 4).setValues([validHeaders])
+         .setBackground('#4CAF50').setFontColor('white').setFontWeight('bold');
     
-    // Header cột F-J (Lỗi) - Cách 1 cột trống (E)
+    // Header bảng LỖI (F-J) - Đỏ
     const errorHeaders = ['ItemCode', 'ItemName', 'UomCode', 'Quantity', 'ErrorReason'];
-    sheet.getRange(1, 6, 1, 5).setValues([errorHeaders]);
-    sheet.getRange(1, 6, 1, 5).setBackground('#F44336').setFontColor('white').setFontWeight('bold');
+    sheet.getRange(1, 6, 1, 5).setValues([errorHeaders])
+         .setBackground('#F44336').setFontColor('white').setFontWeight('bold');
     
-    // Ghi dữ liệu hợp lệ (A-D)
+    // Ghi dữ liệu hợp lệ
     if (validRows.length > 0) {
       sheet.getRange(2, 1, validRows.length, 4).setValues(validRows);
     }
     
-    // Ghi dữ liệu lỗi (F-J)
+    // Ghi dữ liệu lỗi
     if (errorRows.length > 0) {
       sheet.getRange(2, 6, errorRows.length, 5).setValues(errorRows);
-      // Highlight cột ErrorReason
-      sheet.getRange(2, 10, errorRows.length, 1).setBackground('#FFCDD2').setFontColor('#B71C1C').setFontWeight('bold');
+      // Highlight cột ErrorReason (cột J = index 10)
+      sheet.getRange(2, 10, errorRows.length, 1)
+           .setBackground('#FFCDD2').setFontColor('#B71C1C').setFontWeight('bold');
     }
     
-    // Auto-fit columns
+    // 5. FORMAT
+    const maxRows = Math.max(validRows.length, errorRows.length, 1) + 1;
+    
+    // Cột phân cách (E) - Xám nhạt
+    sheet.getRange(1, 5, maxRows, 1).setBackground('#ECEFF1');
+    
+    // Auto-fit
     for (let i = 1; i <= 10; i++) sheet.autoResizeColumn(i);
     sheet.setFrozenRows(1);
     
-    // Thêm border phân cách giữa 2 bảng (cột E)
-    sheet.getRange(1, 5, Math.max(validRows.length, errorRows.length) + 1, 1).setBackground('#ECEFF1');
+    // Thêm summary row
+    const summaryRow = maxRows + 2;
+    sheet.getRange(summaryRow, 1).setValue('✅ Hợp lệ: ' + validRows.length)
+         .setFontWeight('bold').setFontColor('#2E7D32');
+    sheet.getRange(summaryRow, 6).setValue('❌ Lỗi: ' + errorRows.length)
+         .setFontWeight('bold').setFontColor('#C62828');
     
-    // 5. DI CHUYỂN FILE VÀO FOLDER CỐ ĐỊNH
+    // 6. DI CHUYỂN FILE VÀO FOLDER
+    cache.put('EXPORT_PROGRESS', '📁 Đang lưu vào Drive...', 300);
+    
     const file = DriveApp.getFileById(newSS.getId());
     const folder = DriveApp.getFolderById(FOLDER_ID);
     folder.addFile(file);
-    DriveApp.getRootFolder().removeFile(file); // Xóa khỏi root
+    DriveApp.getRootFolder().removeFile(file);
+    
+    cache.remove('EXPORT_PROGRESS');
     
     return {
       success: true,
-      message: 'Tạo file thành công! Hợp lệ: ' + validRows.length + ' | Lỗi: ' + errorRows.length,
+      message: `✅ Xuất thành công! Hợp lệ: ${validRows.length} | Lỗi: ${errorRows.length}`,
       url: newSS.getUrl(),
       fileName: fileName,
       validCount: validRows.length,
@@ -1749,6 +1800,7 @@ function exportSpoilageToExcel(data, config) {
     
   } catch (e) {
     console.error('Export Error:', e);
+    CacheService.getScriptCache().remove('EXPORT_PROGRESS');
     return { success: false, message: 'Lỗi: ' + e.toString() };
   }
 }
@@ -1763,7 +1815,7 @@ function formatCodeVN(code) {
 
 // Helper: Làm tròn số
 function roundNum(n, d) {
-  if (!n || isNaN(n)) return 0;
+  if (n === null || n === undefined || isNaN(n)) return 0;
   return Number(Math.round(n + 'e' + d) + 'e-' + d);
 }
 
