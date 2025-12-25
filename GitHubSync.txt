@@ -1,6 +1,6 @@
 /**
  * ========================================
- * GITHUB SYNC MODULE - STANDALONE
+ * GITHUB SYNC MODULE - STANDALONE 1
  * ========================================
  * File riêng: GitHubSync.gs
  * 
